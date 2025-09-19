@@ -1,3 +1,5 @@
+from gevent import monkey
+monkey.patch_all()
 import os
 import logging
 import random
@@ -517,32 +519,9 @@ def index():
 # Main
 if __name__ == "__main__":
     
-    if not TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN is not set")
-        raise ValueError("TELEGRAM_BOT_TOKEN is not set")
+    async def initialize():
+        await set_webhook()
+        logger.info("Webhook initialized successfully")
     
-    if not WEBHOOK_URL:
-        logger.error("WEBHOOK_URL is not set")
-        raise ValueError("WEBHOOK_URL is not set")
-    
-    # Thay thế hàm set_webhook
-async def set_webhook():
-    try:
-        # Xóa webhook cũ trước
-        await application.bot.delete_webhook()
-        
-        # Đặt webhook mới
-        await application.bot.set_webhook(
-            url=f"{WEBHOOK_URL}/webhook",
-            allowed_updates=["message", "callback_query"]
-        )
-        logger.info(f"Webhook set to: {WEBHOOK_URL}/webhook")
-    except Exception as e:
-        logger.error(f"Failed to set webhook: {e}")
-        raise
-    
-    logger.info("Starting bot and setting webhook...")
-    asyncio.get_event_loop().run_until_complete(set_webhook())
-    logger.info("Starting Flask server...")
-    flask_app.run(host="0.0.0.0", port=PORT, debug=False)
+    asyncio.run(initialize())
     
