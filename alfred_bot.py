@@ -10,11 +10,11 @@ import httpx
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import (
-    Updater,
+    ApplicationBuilder,
     CommandHandler,
     MessageHandler,
-    Filters,
-    CallbackContext
+    ContextTypes,
+    filters
 )
 from telegram.error import TelegramError
 from foods_data import VIETNAMESE_FOODS, REGIONAL_FOODS
@@ -126,7 +126,7 @@ class Database:
 db = Database()
 
 # Handlers
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     logger.info(f"Received /start from user {user_id} in chat {chat_id}")
@@ -139,12 +139,12 @@ def start(update: Update, context: CallbackContext):
             "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
             "- Gửi tên món: Tra thông tin chi tiết."
         )
-        update.message.reply_text(response)
+        await update.message.reply_text(response)
         logger.info(f"Sent /start response to user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send /start response to user {user_id}: {e}")
 
-def suggest(update: Update, context: CallbackContext):
+async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     logger.info(f"Received /suggest from user {user_id} in chat {chat_id}")
@@ -165,12 +165,12 @@ def suggest(update: Update, context: CallbackContext):
             f"- Dịp: {', '.join(food_info['holidays'])}\n"
             f"- Calo ước tính: {food_info['calories']}"
         )
-        update.message.reply_text(response, parse_mode="Markdown")
+        await update.message.reply_text(response, parse_mode="Markdown")
         logger.info(f"Sent /suggest response to user {user_id}: {choice}")
     except Exception as e:
         logger.error(f"Failed to send /suggest response to user {user_id}: {e}")
 
-def region_suggest(update: Update, context: CallbackContext):
+async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     logger.info(f"Received /region from user {user_id} with args: {context.args}")
@@ -206,20 +206,20 @@ def region_suggest(update: Update, context: CallbackContext):
                 region = normalized_regions[best_match]
                 foods = REGIONAL_FOODS[region]
                 response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
-                update.message.reply_text(response, parse_mode="Markdown")
+                await update.message.reply_text(response, parse_mode="Markdown")
                 logger.info(f"Sent /region response to user {user_id}: {region}")
             else:
                 response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v."
-                update.message.reply_text(response)
+                await update.message.reply_text(response)
                 logger.info(f"Sent /region not found response to user {user_id}")
         else:
             response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội"
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             logger.info(f"Sent /region usage response to user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send /region response to user {user_id}: {e}")
 
-def ingredient_suggest(update: Update, context: CallbackContext):
+async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     logger.info(f"Received /ingredient from user {user_id} with args: {context.args}")
@@ -242,55 +242,55 @@ def ingredient_suggest(update: Update, context: CallbackContext):
                     f"- Dịp: {', '.join(food_info['holidays'])}\n"
                     f"- Calo ước tính: {food_info['calories']}"
                 )
-                update.message.reply_text(response, parse_mode="Markdown")
+                await update.message.reply_text(response, parse_mode="Markdown")
                 logger.info(f"Sent /ingredient response to user {user_id}: {choice}")
             else:
                 response = "Không tìm thấy món phù hợp với nguyên liệu. Thử lại!"
-                update.message.reply_text(response)
+                await update.message.reply_text(response)
                 logger.info(f"Sent /ingredient not found response to user {user_id}")
         else:
             response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm"
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             logger.info(f"Sent /ingredient usage response to user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send /ingredient response to user {user_id}: {e}")
 
-def location_suggest(update: Update, context: CallbackContext):
+async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     logger.info(f"Received /location from user {user_id}")
     try:
         response = "Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu)."
-        update.message.reply_text(response)
+        await update.message.reply_text(response)
         logger.info(f"Sent /location response to user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send /location response to user {user_id}: {e}")
 
-def handle_location(update: Update, context: CallbackContext):
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     location = update.message.location
     logger.info(f"Received location from user {user_id}: {location.latitude if location else None}, {location.longitude if location else None}")
     try:
         if location:
-            region = "Sài Gòn"  # Giả lập, cần API geocode để thực tế
+            region = "Sài Gòn"
             foods = REGIONAL_FOODS.get(region, [])
             if foods:
                 response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
-                update.message.reply_text(response, parse_mode="Markdown")
+                await update.message.reply_text(response, parse_mode="Markdown")
                 logger.info(f"Sent location-based response to user {user_id}: {region}")
             else:
                 response = "Không tìm thấy vùng gần vị trí của bạn."
-                update.message.reply_text(response)
+                await update.message.reply_text(response)
                 logger.info(f"Sent location not found response to user {user_id}")
         else:
             response = "Vui lòng chia sẻ position."
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             logger.info(f"Sent location request response to user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send location response to user {user_id}: {e}")
 
-def echo(update: Update, context: CallbackContext):
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     text = update.message.text.lower()
@@ -307,11 +307,11 @@ def echo(update: Update, context: CallbackContext):
                 f"- Dịp: {', '.join(food_info['holidays'])}\n"
                 f"- Calo ước tính: {food_info['calories']}"
             )
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             logger.info(f"Sent echo response to user {user_id}: {text}")
         else:
             response = "Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!"
-            update.message.reply_text(response)
+            await update.message.reply_text(response)
             logger.info(f"Sent echo not found response to user {user_id}")
     except Exception as e:
         logger.error(f"Failed to send echo response to user {user_id}: {e}")
@@ -319,21 +319,20 @@ def echo(update: Update, context: CallbackContext):
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    updater = Updater(TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
+    application = ApplicationBuilder().token(TOKEN).build()
     logger.info("Application built successfully")
 except Exception as e:
     logger.error(f"Failed to build application: {e}")
     raise
 
 # Add handlers
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("suggest", suggest))
-dispatcher.add_handler(CommandHandler("region", region_suggest))
-dispatcher.add_handler(CommandHandler("ingredient", ingredient_suggest))
-dispatcher.add_handler(CommandHandler("location", location_suggest))
-dispatcher.add_handler(MessageHandler(Filters.location, handle_location))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("suggest", suggest))
+application.add_handler(CommandHandler("region", region_suggest))
+application.add_handler(CommandHandler("ingredient", ingredient_suggest))
+application.add_handler(CommandHandler("location", location_suggest))
+application.add_handler(MessageHandler(filters.LOCATION, handle_location))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 # Flask app for Render webhook
 flask_app = Flask(__name__)
@@ -341,8 +340,11 @@ flask_app = Flask(__name__)
 @flask_app.post("/webhook")
 def webhook():
     try:
-        update = Update.de_json(request.get_json(), updater.bot)
-        dispatcher.process_update(update)
+        update = Update.de_json(request.get_json(), application.bot)
+        asyncio.run_coroutine_threadsafe(
+            application.process_update(update),
+            asyncio.get_event_loop()
+        )
         return "ok", 200
     except Exception as e:
         logger.error(f"Webhook error: {e}")
@@ -353,9 +355,9 @@ def index():
     return "Alfred Food Bot is running!", 200
 
 # Set webhook on startup
-def set_webhook():
+async def set_webhook():
     try:
-        updater.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+        await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
         logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
     except Exception as e:
         logger.error(f"Failed to set webhook: {e}")
@@ -370,5 +372,6 @@ if __name__ == "__main__":
         logger.error("WEBHOOK_URL is not set")
         raise ValueError("WEBHOOK_URL is not set")
     
-    set_webhook()
+    # Initialize and set webhook
+    asyncio.run(set_webhook())
     logger.info("Bot started successfully")
