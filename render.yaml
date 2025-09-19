@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: alfred-food-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python alfred_bot.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: RENDER
+        value: true
+      - key: WEBHOOK_URL
+        fromGroup:
+          name: alfred-food-bot
+          key: url
+      - key: DATABASE_URL
+        fromService:
+          type: pgsql
+          name: alfred-db
+          property: connectionString
+
+  - type: pgsql
+    name: alfred-db
+    plan: free
+    ipAllowList: []
+    databaseName: alfreddb
