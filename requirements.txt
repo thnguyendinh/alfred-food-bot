@@ -5,3 +5,4 @@ uvicorn==0.30.6  # ASGI server for async Flask
 pg8000==1.31.2
 httpx==0.25.2  # Pin version có fix bug event loop
 httpcore==0.18.0  # Pin để tương thích
+anyio==3.7.1  # Pin để fix bug loop closed
