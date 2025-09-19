@@ -141,8 +141,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(response)
         logger.info(f"Sent /start response to user {user_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in /start: {te.message} (code: {getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
-        logger.error(f"Failed to send /start response to user {user_id}: {e}")
+        logger.error(f"Failed to send /start response: {e}", exc_info=True)
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
