@@ -54,29 +54,37 @@ async def validate_token():
 
 # Database
 class Database:
-    def __init__(self):
-        self.use_postgres = False
-        self.pg_conn = None
-        self.sqlite_conn = None
-        if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
-            try:
-                parsed = urllib.parse.urlparse(DATABASE_URL)
-                db_params = {
-                    "user": parsed.username,
-                    "password": parsed.password,
-                    "host": parsed.hostname,
-                    "port": parsed.port,
-                    "database": parsed.path.lstrip('/')
-                }
-                self.pg_conn = pg8000.native.Connection(**db_params)
-                self.use_postgres = True
-                self.pg_conn.run("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
-                logger.info("Connected to PostgreSQL")
-            except Exception as e:
-                logger.error(f"Postgres init failed: {e}. Falling back to SQLite.")
-                self._init_sqlite()
-        else:
-            self._init_sqlite()
+    # Trong class Database, sửa phương thức _init_sqlite
+def _init_sqlite(self):
+    try:
+        self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
+        self.sqlite_conn.execute("""
+            CREATE TABLE IF NOT EXISTS eaten_foods (
+                user_id TEXT, 
+                food TEXT, 
+                timestamp INTEGER
+            )
+        """)
+        self.sqlite_conn.commit()
+        logger.info("Connected to SQLite successfully")
+    except sqlite3.Error as e:
+        logger.error(f"SQLite connection error: {e}")
+        # Tạo thư mục nếu cần
+        os.makedirs(os.path.dirname("alfred.db"), exist_ok=True)
+        try:
+            self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
+            self.sqlite_conn.execute("""
+                CREATE TABLE IF NOT EXISTS eaten_foods (
+                    user_id TEXT, 
+                    food TEXT, 
+                    timestamp INTEGER
+                )
+            """)
+            self.sqlite_conn.commit()
+            logger.info("SQLite connection established after retry")
+        except sqlite3.Error as e2:
+            logger.error(f"SQLite retry failed: {e2}")
+            raise
 
     def _init_sqlite(self):
         try:
