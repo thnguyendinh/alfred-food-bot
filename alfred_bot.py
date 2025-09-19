@@ -127,11 +127,10 @@ db = Database()
 
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    chat_id = update.effective_chat.id
-    logger.info(f"START HANDLER: Received /start from user {user_id}")
-    
     try:
+        user_id = str(update.effective_user.id)
+        logger.info(f"🎯 START HANDLER TRIGGERED for user {user_id}")
+        
         response = (
             "Xin chào! Mình là Alfred Food Bot.\n"
             "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
@@ -141,12 +140,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- Gửi tên món: Tra thông tin chi tiết."
         )
         
-        logger.info(f"START HANDLER: Attempting to reply to user {user_id}")
+        logger.info(f"📤 Attempting to send response to user {user_id}")
         await update.message.reply_text(response)
-        logger.info(f"START HANDLER: Successfully replied to user {user_id}")
+        logger.info(f"✅ Successfully sent response to user {user_id}")
         
     except Exception as e:
-        logger.error(f"START HANDLER ERROR: {e}", exc_info=True)
+        logger.error(f"❌ START HANDLER ERROR: {e}", exc_info=True)
+        raise
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -321,22 +321,25 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to send echo response to user {user_id}: {e}")
 
 # Build Application
-# Build Application
 try:
     logger.info("Building Telegram application...")
+    
+    # Tạo application instance
     application = ApplicationBuilder().token(TOKEN).build()
-    logger.info("Application built successfully")
+    
+    # Tạo dispatcher và thêm handlers TRỰC TIẾP
+    dispatcher = application.dispatcher
     
     # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("suggest", suggest))
-    application.add_handler(CommandHandler("region", region_suggest))
-    application.add_handler(CommandHandler("ingredient", ingredient_suggest))
-    application.add_handler(CommandHandler("location", location_suggest))
-    application.add_handler(MessageHandler(filters.LOCATION, handle_location))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("suggest", suggest))
+    dispatcher.add_handler(CommandHandler("region", region_suggest))
+    dispatcher.add_handler(CommandHandler("ingredient", ingredient_suggest))
+    dispatcher.add_handler(CommandHandler("location", location_suggest))
+    dispatcher.add_handler(MessageHandler(filters.LOCATION, handle_location))
+    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
     
-    logger.info("All handlers registered successfully")
+    logger.info("Application built successfully with all handlers")
     
 except Exception as e:
     logger.error(f"Failed to build application: {e}", exc_info=True)
@@ -371,9 +374,9 @@ def webhook():
         if update and update.message:
             logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
             
-            # Xử lý update trực tiếp
+            # Xử lý update TRỰC TIẾP qua dispatcher
             asyncio.run_coroutine_threadsafe(
-                application.process_update(update),
+                application.dispatcher.process_update(update),
                 asyncio.get_event_loop()
             )
             return "ok", 200
@@ -384,10 +387,6 @@ def webhook():
     except Exception as e:
         logger.error(f"Webhook error: {e}", exc_info=True)
         return "Error", 500
-@flask_app.get("/")
-def index():
-    return "Alfred Food Bot is running!", 200
-
 # Set webhook on startup
 async def set_webhook():
     try:
@@ -396,6 +395,7 @@ async def set_webhook():
     except Exception as e:
         logger.error(f"Failed to set webhook: {e}")
 
+# Main
 # Main
 if __name__ == "__main__":
     if not TOKEN:
@@ -406,30 +406,19 @@ if __name__ == "__main__":
         logger.error("WEBHOOK_URL is not set")
         raise ValueError("WEBHOOK_URL is not set")
     
-    # Initialize and set webhook
-    async def init_bot():
+    # Set webhook on startup
+    async def set_webhook():
         try:
-            # Test bot token
-            bot_info = await application.bot.get_me()
-            logger.info(f"Bot info: {bot_info}")
-            
-            # Set webhook
-            await set_webhook()
-            
-            # Check webhook info
-            webhook_info = await application.bot.get_webhook_info()
-            logger.info(f"Webhook info: {webhook_info}")
-            
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
         except Exception as e:
-            logger.error(f"Initialization error: {e}", exc_info=True)
+            logger.error(f"Failed to set webhook: {e}")
             raise
     
-    # Khởi tạo application
     try:
-        # Initialize application (phiên bản 20.x không cần await initialize())
-        logger.info("Application starting...")
-        asyncio.run(init_bot())
-        logger.info("Bot started successfully")
+        # Chỉ set webhook, không cần initialize phức tạp
+        asyncio.run(set_webhook())
+        logger.info("🤖 Bot webhook configured successfully")
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
         raise
