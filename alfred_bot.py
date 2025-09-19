@@ -37,7 +37,7 @@ SELECTING_ACTION, CHOOSING_TYPE, PROVIDING_LOCATION, GETTING_HISTORY = range(4)
 
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
-    VIETNAMESE_FOODS = {
+    
     # ===== Miền Bắc =====
     "phở": {
         "type": "nước", "category": "phở",
