@@ -16,6 +16,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+from telegram.error import TelegramError
 from foods_data import VIETNAMESE_FOODS, REGIONAL_FOODS
 
 # Logging
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
-PORT = int(os.getenv("PORT", 10000))
+PORT = int(os.getenv("PORT", 8443))
 
 # Log environment variables
 logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
@@ -41,11 +42,14 @@ logger.info(f"TOKEN: {'Set' if TOKEN else 'Not set'}")
 async def validate_token():
     try:
         bot = Bot(TOKEN)
-        await bot.get_me()
-        logger.info("Bot token is valid")
+        bot_info = await bot.get_me()
+        logger.info(f"Bot token is valid: {bot_info}")
         return True
+    except TelegramError as te:
+        logger.error(f"Invalid bot token: {te.message}")
+        return False
     except Exception as e:
-        logger.error(f"Invalid bot token: {e}")
+        logger.error(f"Error validating token: {e}")
         return False
 
 # Database
@@ -119,7 +123,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /start from user {user_id}")
     try:
-        await update.message.reply_text(
+        response = (
             "Xin chào! Mình là Alfred Food Bot.\n"
             "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
             "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
@@ -127,7 +131,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
             "- Gửi tên món: Tra thông tin chi tiết."
         )
-        logger.info(f"Sent /start response to user {user_id}")
+        sent_message = await update.message.reply_text(response)
+        logger.info(f"Sent /start response to user {user_id}: message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in /start for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send /start response to user {user_id}: {e}")
 
@@ -151,8 +158,10 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- Dịp: {', '.join(food_info['holidays'])}\n"
             f"- Calo ước tính: {food_info['calories']}"
         )
-        await update.message.reply_text(response, parse_mode="Markdown")
-        logger.info(f"Sent /suggest response to user {user_id}: {choice}")
+        sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+        logger.info(f"Sent /suggest response to user {user_id}: {choice}, message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in /suggest for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send /suggest response to user {user_id}: {e}")
 
@@ -191,14 +200,16 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 region = normalized_regions[best_match]
                 foods = REGIONAL_FOODS[region]
                 response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
-                await update.message.reply_text(response, parse_mode="Markdown")
-                logger.info(f"Sent /region response to user {user_id}: {region}")
+                sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+                logger.info(f"Sent /region response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
-                await update.message.reply_text(f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
-                logger.info(f"Sent /region not found response to user {user_id}")
+                sent_message = await update.message.reply_text(f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
+                logger.info(f"Sent /region not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
-            logger.info(f"Sent /region usage response to user {user_id}")
+            sent_message = await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
+            logger.info(f"Sent /region usage response to user {user_id}: message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in /region for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send /region response to user {user_id}: {e}")
 
@@ -224,14 +235,16 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"- Dịp: {', '.join(food_info['holidays'])}\n"
                     f"- Calo ước tính: {food_info['calories']}"
                 )
-                await update.message.reply_text(response, parse_mode="Markdown")
-                logger.info(f"Sent /ingredient response to user {user_id}: {choice}")
+                sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+                logger.info(f"Sent /ingredient response to user {user_id}: {choice}, message_id={sent_message.message_id}")
             else:
-                await update.message.reply_text("Không tìm thấy món phù hợp với nguyên liệu. Thử lại!")
-                logger.info(f"Sent /ingredient not found response to user {user_id}")
+                sent_message = await update.message.reply_text("Không tìm thấy món phù hợp với nguyên liệu. Thử lại!")
+                logger.info(f"Sent /ingredient not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            await update.message.reply_text("Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm")
-            logger.info(f"Sent /ingredient usage response to user {user_id}")
+            sent_message = await update.message.reply_text("Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm")
+            logger.info(f"Sent /ingredient usage response to user {user_id}: message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in /ingredient for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send /ingredient response to user {user_id}: {e}")
 
@@ -239,8 +252,10 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /location from user {user_id}")
     try:
-        await update.message.reply_text("Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu).")
-        logger.info(f"Sent /location response to user {user_id}")
+        sent_message = await update.message.reply_text("Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu).")
+        logger.info(f"Sent /location response to user {user_id}: message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in /location for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send /location response to user {user_id}: {e}")
 
@@ -254,14 +269,16 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             foods = REGIONAL_FOODS.get(region, [])
             if foods:
                 response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
-                await update.message.reply_text(response, parse_mode="Markdown")
-                logger.info(f"Sent location-based response to user {user_id}: {region}")
+                sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+                logger.info(f"Sent location-based response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
-                await update.message.reply_text("Không tìm thấy vùng gần vị trí của bạn.")
-                logger.info(f"Sent location not found response to user {user_id}")
+                sent_message = await update.message.reply_text("Không tìm thấy vùng gần vị trí của bạn.")
+                logger.info(f"Sent location not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            await update.message.reply_text("Vui lòng chia sẻ position.")
-            logger.info(f"Sent location request response to user {user_id}")
+            sent_message = await update.message.reply_text("Vui lòng chia sẻ position.")
+            logger.info(f"Sent location request response to user {user_id}: message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in handle_location for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send location response to user {user_id}: {e}")
 
@@ -281,11 +298,13 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Dịp: {', '.join(food_info['holidays'])}\n"
                 f"- Calo ước tính: {food_info['calories']}"
             )
-            await update.message.reply_text(response)
-            logger.info(f"Sent echo response to user {user_id}: {text}")
+            sent_message = await update.message.reply_text(response)
+            logger.info(f"Sent echo response to user {user_id}: {text}, message_id={sent_message.message_id}")
         else:
-            await update.message.reply_text("Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!")
-            logger.info(f"Sent echo not found response to user {user_id}")
+            sent_message = await update.message.reply_text("Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!")
+            logger.info(f"Sent echo not found response to user {user_id}: message_id={sent_message.message_id}")
+    except TelegramError as te:
+        logger.error(f"Telegram error in echo for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
     except Exception as e:
         logger.error(f"Failed to send echo response to user {user_id}: {e}")
 
@@ -360,6 +379,9 @@ if __name__ == "__main__":
                 logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
             else:
                 logger.info("Webhook already set correctly")
+        except TelegramError as te:
+            logger.error(f"Failed to set webhook: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+            raise
         except Exception as e:
             logger.error(f"Failed to set webhook: {e}")
             raise
@@ -368,4 +390,3 @@ if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(set_webhook())
     logger.info("Starting Flask server...")
     flask_app.run(host="0.0.0.0", port=PORT)
-
