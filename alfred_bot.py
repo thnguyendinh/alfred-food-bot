@@ -1,5 +1,3 @@
-import anyio
-anyio._backends._asyncio.TaskGroup.__init__ = lambda self, *args, **kwargs: None  # Workaround bug
 import os
 import logging
 import random
@@ -16,6 +14,10 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+
+# Workaround for event loop closed bug
+import anyio
+anyio._backends._asyncio.TaskGroup.__init__ = lambda self, *args, **kwargs: None  # Workaround bug
 
 # Logging
 logging.basicConfig(
@@ -116,7 +118,6 @@ db = Database()
 # --------------------------------------------------------------------
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
-    # Miền Bắc
     "phở": {
         "type": "nước", "category": "phở",
         "ingredients": ["bánh phở", "thịt bò/gà", "xương hầm", "hành", "rau thơm"],
@@ -159,8 +160,6 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Hải Phòng"],
         "holidays": ["Bữa trưa"]
     },
-
-    # Miền Trung
     "bún bò Huế": {
         "type": "nước", "category": "bún",
         "ingredients": ["bún", "thịt bò", "giò heo", "mắm ruốc"],
@@ -210,8 +209,6 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Hội An", "Quảng Nam"],
         "holidays": ["Du lịch"]
     },
-
-    # Miền Nam
     "cơm tấm": {
         "type": "khô", "category": "cơm",
         "ingredients": ["gạo tấm", "sườn nướng", "bì", "chả trứng"],
@@ -370,7 +367,7 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         normalized_input = normalize_string(user_input)
         normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
 
-        # Simple fuzzy match using Levenshtein distance (implement thủ công vì không có fuzzywuzzy)
+        # Simple fuzzy match using Levenshtein distance
         def levenshtein_distance(s1, s2):
             if len(s1) < len(s2):
                 return levenshtein_distance(s2, s1)
@@ -389,7 +386,7 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
         distance = levenshtein_distance(normalized_input, best_match)
-        if distance <= 2:  # Threshold cho match gần (tùy chỉnh)
+        if distance <= 3:  # Increased threshold for flexibility
             region = normalized_regions[best_match]
             foods = REGIONAL_FOODS[region]
             response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
@@ -421,7 +418,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    application = ApplicationBuilder().token(TOKEN).http_version("1.1").request_kwargs({'con_pool_size': 8, 'read_timeout': 10}).build()
+    application = ApplicationBuilder().token(TOKEN).http_version("1.1").build()
     logger.info("Application built successfully")
 except Exception as e:
     logger.error(f"Failed to build application: {e}")
