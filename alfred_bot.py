@@ -516,6 +516,7 @@ def index():
 
 # Main
 if __name__ == "__main__":
+    
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is not set")
         raise ValueError("TELEGRAM_BOT_TOKEN is not set")
@@ -543,4 +544,5 @@ async def set_webhook():
     logger.info("Starting bot and setting webhook...")
     asyncio.get_event_loop().run_until_complete(set_webhook())
     logger.info("Starting Flask server...")
-    flask_app.run(host="0.0.0.0", port=PORT)
+    flask_app.run(host="0.0.0.0", port=PORT, debug=False)
+    
