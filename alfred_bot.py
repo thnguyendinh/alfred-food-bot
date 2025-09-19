@@ -6,7 +6,7 @@ import urllib.parse
 import pg8000.native
 import sqlite3
 from flask import Flask, request
-from telegram import Update
+from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -33,6 +33,17 @@ logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
 logger.info(f"DATABASE_URL: {'Set' if DATABASE_URL else 'Not set'}")
 logger.info(f"PORT: {PORT}")
 logger.info(f"TOKEN: {'Set' if TOKEN else 'Not set'}")
+
+# Validate token
+async def validate_token():
+    try:
+        bot = Bot(TOKEN)
+        await bot.get_me()
+        logger.info("Bot token is valid")
+        return True
+    except Exception as e:
+        logger.error(f"Invalid bot token: {e}")
+        return False
 
 # --------------------------------------------------------------------
 # Database
@@ -103,7 +114,6 @@ db = Database()
 # --------------------------------------------------------------------
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
-    # Miền Bắc
     "phở": {
         "type": "nước", "category": "phở",
         "ingredients": ["bánh phở", "thịt bò/gà", "xương hầm", "hành", "rau thơm"],
@@ -146,8 +156,6 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Hải Phòng"],
         "holidays": ["Bữa trưa"]
     },
-
-    # Miền Trung
     "bún bò Huế": {
         "type": "nước", "category": "bún",
         "ingredients": ["bún", "thịt bò", "giò heo", "mắm ruốc"],
@@ -197,8 +205,6 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Hội An", "Quảng Nam"],
         "holidays": ["Du lịch"]
     },
-
-    # Miền Nam
     "cơm tấm": {
         "type": "khô", "category": "cơm",
         "ingredients": ["gạo tấm", "sườn nướng", "bì", "chả trứng"],
@@ -380,6 +386,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Build Application
 try:
     logger.info("Building Telegram application...")
+    if not asyncio.get_event_loop().run_until_complete(validate_token()):
+        raise ValueError("Invalid bot token")
     application = ApplicationBuilder().token(TOKEN).build()
     logger.info("Application built successfully")
 except Exception as e:
