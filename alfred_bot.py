@@ -1,5 +1,4 @@
-from gevent import monkey
-monkey.patch_all()
+
 import os
 import logging
 import random
@@ -56,23 +55,31 @@ async def validate_token():
 
 # Database
 class Database:
-    # Trong class Database, sửa phương thức _init_sqlite
-def _init_sqlite(self):
-    try:
-        self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
-        self.sqlite_conn.execute("""
-            CREATE TABLE IF NOT EXISTS eaten_foods (
-                user_id TEXT, 
-                food TEXT, 
-                timestamp INTEGER
-            )
-        """)
-        self.sqlite_conn.commit()
-        logger.info("Connected to SQLite successfully")
-    except sqlite3.Error as e:
-        logger.error(f"SQLite connection error: {e}")
-        # Tạo thư mục nếu cần
-        os.makedirs(os.path.dirname("alfred.db"), exist_ok=True)
+    def __init__(self):
+        self.use_postgres = False
+        self.pg_conn = None
+        self.sqlite_conn = None
+        if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+            try:
+                parsed = urllib.parse.urlparse(DATABASE_URL)
+                db_params = {
+                    "user": parsed.username,
+                    "password": parsed.password,
+                    "host": parsed.hostname,
+                    "port": parsed.port,
+                    "database": parsed.path.lstrip('/')
+                }
+                self.pg_conn = pg8000.native.Connection(**db_params)
+                self.use_postgres = True
+                self.pg_conn.run("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
+                logger.info("Connected to PostgreSQL")
+            except Exception as e:
+                logger.error(f"Postgres init failed: {e}. Falling back to SQLite.")
+                self._init_sqlite()
+        else:
+            self._init_sqlite()
+
+    def _init_sqlite(self):
         try:
             self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
             self.sqlite_conn.execute("""
@@ -83,48 +90,27 @@ def _init_sqlite(self):
                 )
             """)
             self.sqlite_conn.commit()
-            logger.info("SQLite connection established after retry")
-        except sqlite3.Error as e2:
-            logger.error(f"SQLite retry failed: {e2}")
-            raise
+            logger.info("Connected to SQLite successfully")
+        except sqlite3.Error as e:
+            logger.error(f"SQLite connection error: {e}")
+            # Tạo thư mục nếu cần
+            os.makedirs(os.path.dirname("alfred.db"), exist_ok=True)
+            try:
+                self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
+                self.sqlite_conn.execute("""
+                    CREATE TABLE IF NOT EXISTS eaten_foods (
+                        user_id TEXT, 
+                        food TEXT, 
+                        timestamp INTEGER
+                    )
+                """)
+                self.sqlite_conn.commit()
+                logger.info("SQLite connection established after retry")
+            except sqlite3.Error as e2:
+                logger.error(f"SQLite retry failed: {e2}")
+                raise
 
-    def _init_sqlite(self):
-        try:
-            self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
-            self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
-            self.sqlite_conn.commit()
-            logger.info("Connected to SQLite")
-        except Exception as e:
-            logger.error(f"SQLite init failed: {e}")
-
-    def get_conn(self):
-        return self.pg_conn if self.use_postgres else self.sqlite_conn
-
-    def add_eaten(self, user_id, food):
-        conn = self.get_conn()
-        try:
-            timestamp = int(time.time())
-            if self.use_postgres:
-                conn.run("INSERT INTO eaten_foods (user_id, food, timestamp) VALUES (:u, :f, :t)", u=user_id, f=food, t=timestamp)
-            else:
-                conn.execute("INSERT INTO eaten_foods (user_id, food, timestamp) VALUES (?, ?, ?)", (user_id, food, timestamp))
-                conn.commit()
-            logger.info(f"Added food {food} for user {user_id} at {timestamp}")
-        except Exception as e:
-            logger.error(f"DB add error: {e}")
-
-    def get_eaten(self, user_id):
-        conn = self.get_conn()
-        try:
-            if self.use_postgres:
-                rows = conn.run("SELECT food FROM eaten_foods WHERE user_id=:u ORDER BY timestamp DESC LIMIT 10", u=user_id)
-                return [r[0] for r in rows]
-            else:
-                rows = conn.execute("SELECT food FROM eaten_foods WHERE user_id=? ORDER BY timestamp DESC LIMIT 10", (user_id,))
-                return [r[0] for r in rows.fetchall()]
-        except Exception as e:
-            logger.error(f"DB fetch error: {e}")
-            return []
+    # ... các phương thức khác giữ nguyên ...
 
 db = Database()
 
@@ -516,12 +502,38 @@ def index():
 def index():
     return "Alfred Food Bot running!", 200
 
+
+async def set_webhook():
+    try:
+        webhook_info = await application.bot.get_webhook_info()
+        logger.info(f"Current webhook info: {webhook_info}")
+        if webhook_info.url != f"{WEBHOOK_URL}/webhook":
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+        else:
+            logger.info("Webhook already set correctly")
+    except TelegramError as te:
+        logger.error(f"Failed to set webhook: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {e}")
+        raise
+
 # Main
 if __name__ == "__main__":
+    if not TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN is not set")
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set")
     
-    async def initialize():
+    if not WEBHOOK_URL:
+        logger.error("WEBHOOK_URL is not set")
+        raise ValueError("WEBHOOK_URL is not set")
+    
+    async def main():
         await set_webhook()
         logger.info("Webhook initialized successfully")
     
-    asyncio.run(initialize())
+    asyncio.run(main())
+    
+    # Không chạy flask_app.run() vì gunicorn sẽ handle
     
