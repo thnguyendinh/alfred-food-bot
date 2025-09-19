@@ -393,10 +393,17 @@ except Exception as e:
     raise
 
 # Hàm xử lý update trong background
+# Hàm xử lý update trong background
 def process_update_async(update):
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        
+        # Initialize application nếu chưa initialized
+        if not application.initialized:
+            loop.run_until_complete(application.initialize())
+        
+        # Xử lý update
         loop.run_until_complete(application.process_update(update))
         loop.close()
         logger.info(f"Successfully processed update: {update.update_id}")
@@ -456,6 +463,7 @@ async def set_webhook():
         raise
 
 # Main
+# Main
 if __name__ == "__main__":
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is not set")
@@ -465,14 +473,32 @@ if __name__ == "__main__":
         logger.error("WEBHOOK_URL is not set")
         raise ValueError("WEBHOOK_URL is not set")
     
+    async def init_bot():
+        try:
+            # Initialize application
+            await application.initialize()
+            logger.info("Application initialized successfully")
+            
+            # Set webhook
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+            
+            # Test bot
+            bot_info = await application.bot.get_me()
+            logger.info(f"Bot info: {bot_info}")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize bot: {e}", exc_info=True)
+            raise
+    
     try:
-        # Khởi tạo webhook
+        # Khởi tạo application
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(set_webhook())
+        loop.run_until_complete(init_bot())
         loop.close()
         
-        logger.info("🤖 Bot webhook configured successfully - ready for requests!")
+        logger.info("🤖 Bot initialized successfully - ready for requests!")
         
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
