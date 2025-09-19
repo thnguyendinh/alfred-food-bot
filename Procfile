@@ -1,1 +1,1 @@
-web: gunicorn alfred_bot:flask_app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+web: gunicorn -k gevent --bind 0.0.0.0:$PORT alfred_bot:flask_app --workers 1 --timeout 120
