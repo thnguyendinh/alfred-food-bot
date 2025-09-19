@@ -319,12 +319,25 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Failed to send echo response to user {user_id}: {e}")
 
 # Build Application
+# Build Application
 try:
     logger.info("Building Telegram application...")
     application = ApplicationBuilder().token(TOKEN).build()
     logger.info("Application built successfully")
+    
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("suggest", suggest))
+    application.add_handler(CommandHandler("region", region_suggest))
+    application.add_handler(CommandHandler("ingredient", ingredient_suggest))
+    application.add_handler(CommandHandler("location", location_suggest))
+    application.add_handler(MessageHandler(filters.LOCATION, handle_location))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    
+    logger.info("All handlers registered successfully")
+    
 except Exception as e:
-    logger.error(f"Failed to build application: {e}")
+    logger.error(f"Failed to build application: {e}", exc_info=True)
     raise
 
 # Add handlers
@@ -355,6 +368,12 @@ def webhook():
         # Xử lý update
         if update and update.message:
             logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
+            
+            # Đảm bảo application đã initialized
+            if not application.initialized:
+                asyncio.run(application.initialize())
+                
+            # Xử lý update
             asyncio.run_coroutine_threadsafe(
                 application.process_update(update),
                 asyncio.get_event_loop()
@@ -394,6 +413,10 @@ if __name__ == "__main__":
     # Initialize and set webhook
     async def init_bot():
         try:
+            # Initialize application
+            await application.initialize()
+            logger.info("Application initialized successfully")
+            
             # Test bot token
             bot_info = await application.bot.get_me()
             logger.info(f"Bot info: {bot_info}")
@@ -406,7 +429,7 @@ if __name__ == "__main__":
             logger.info(f"Webhook info: {webhook_info}")
             
         except Exception as e:
-            logger.error(f"Initialization error: {e}")
+            logger.error(f"Initialization error: {e}", exc_info=True)
             raise
     
     asyncio.run(init_bot())
