@@ -3,5 +3,3 @@ python-telegram-bot==20.7
 gunicorn==21.2.0
 pg8000==1.30.3
 httpx==0.25.2
-gevent==23.9.1
-greenlet==3.0.3
