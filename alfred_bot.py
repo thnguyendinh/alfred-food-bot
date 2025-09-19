@@ -1,4 +1,3 @@
-
 import os
 import logging
 import random
@@ -148,7 +147,16 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response, parse_mode="Markdown")
     # Lệnh giả
     await asyncio.sleep(0.1)
-    fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': user_id}}}, application.bot)
+    fake_update = Update.de_json(
+        {
+            'update_id': random.randint(1, 1000),
+            'message': {
+                'text': '/fake',
+                'chat': {'id': user_id, 'type': 'private'},
+                'date': int(time.time())
+            }
+        }, application.bot
+    )
     await application.process_update(fake_update)
 
 async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -192,7 +200,16 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
     # Lệnh giả
     await asyncio.sleep(0.1)
-    fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': user_id}}}, application.bot)
+    fake_update = Update.de_json(
+        {
+            'update_id': random.randint(1, 1000),
+            'message': {
+                'text': '/fake',
+                'chat': {'id': user_id, 'type': 'private'},
+                'date': int(time.time())
+            }
+        }, application.bot
+    )
     await application.process_update(fake_update)
 
 async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -223,7 +240,16 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm")
     # Lệnh giả
     await asyncio.sleep(0.1)
-    fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': user_id}}}, application.bot)
+    fake_update = Update.de_json(
+        {
+            'update_id': random.randint(1, 1000),
+            'message': {
+                'text': '/fake',
+                'chat': {'id': user_id, 'type': 'private'},
+                'date': int(time.time())
+            }
+        }, application.bot
+    )
     await application.process_update(fake_update)
 
 async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -232,7 +258,16 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu).")
     # Lệnh giả
     await asyncio.sleep(0.1)
-    fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': user_id}}}, application.bot)
+    fake_update = Update.de_json(
+        {
+            'update_id': random.randint(1, 1000),
+            'message': {
+                'text': '/fake',
+                'chat': {'id': user_id, 'type': 'private'},
+                'date': int(time.time())
+            }
+        }, application.bot
+    )
     await application.process_update(fake_update)
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -251,7 +286,16 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Vui lòng chia sẻ position.")
     # Lệnh giả
     await asyncio.sleep(0.1)
-    fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': user_id}}}, application.bot)
+    fake_update = Update.de_json(
+        {
+            'update_id': random.randint(1, 1000),
+            'message': {
+                'text': '/fake',
+                'chat': {'id': user_id, 'type': 'private'},
+                'date': int(time.time())
+            }
+        }, application.bot
+    )
     await application.process_update(fake_update)
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -274,7 +318,16 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!")
     # Lệnh giả
     await asyncio.sleep(0.1)
-    fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': user_id}}}, application.bot)
+    fake_update = Update.de_json(
+        {
+            'update_id': random.randint(1, 1000),
+            'message': {
+                'text': '/fake',
+                'chat': {'id': user_id, 'type': 'private'},
+                'date': int(time.time())
+            }
+        }, application.bot
+    )
     await application.process_update(fake_update)
 
 # Build Application
@@ -313,7 +366,16 @@ def webhook():
             asyncio.run_coroutine_threadsafe(application.process_update(update), asyncio.get_event_loop())
             logger.info(f"Processed update: {update.update_id}")
             # Lệnh giả trong webhook
-            fake_update = Update.de_json({'update_id': random.randint(1, 1000), 'message': {'text': '/fake', 'chat': {'id': update.effective_user.id}}}, application.bot)
+            fake_update = Update.de_json(
+                {
+                    'update_id': random.randint(1, 1000),
+                    'message': {
+                        'text': '/fake',
+                        'chat': {'id': update.effective_user.id, 'type': 'private'},
+                        'date': int(time.time())
+                    }
+                }, application.bot
+            )
             asyncio.run_coroutine_threadsafe(application.process_update(fake_update), asyncio.get_event_loop())
             return "ok", 200
         else:
