@@ -357,17 +357,11 @@ def webhook():
         if update and update.message:
             logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
             
-            # Xử lý update TRỰC TIẾP - không dùng asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Put update vào queue
+            application.update_queue.put_nowait(update)
+            logger.info(f"Update {update.update_id} added to queue")
             
-            try:
-                loop.run_until_complete(application.process_update(update))
-                logger.info(f"Successfully processed update: {update.update_id}")
-                return "ok", 200
-            finally:
-                loop.close()
-                
+            return "ok", 200
         else:
             logger.warning("Invalid update format")
             return "Invalid update", 400
