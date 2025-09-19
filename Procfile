@@ -1,1 +1,1 @@
-web: gunicorn alfred_bot:flask_app --bind 0.0.0.0:10000
+web: uvicorn alfred_bot:flask_app --host 0.0.0.0 --port 10000 --workers 1
