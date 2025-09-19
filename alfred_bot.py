@@ -401,6 +401,7 @@ async def set_webhook():
         raise
 
 # Main
+# Main
 if __name__ == "__main__":
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is not set")
@@ -410,9 +411,37 @@ if __name__ == "__main__":
         logger.error("WEBHOOK_URL is not set")
         raise ValueError("WEBHOOK_URL is not set")
     
+    # Set webhook on startup
+    async def init_bot():
+        try:
+            # Set webhook
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+            
+            # Test bot
+            bot_info = await application.bot.get_me()
+            logger.info(f"Bot info: {bot_info}")
+            
+            # Start processing updates
+            logger.info("Starting to process updates...")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize bot: {e}", exc_info=True)
+            raise
+    
     try:
-        asyncio.run(set_webhook())
-        logger.info("🤖 Bot started successfully")
+        # Khởi tạo và chạy
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(init_bot())
+        
+        # Giữ application running
+        logger.info("🤖 Bot started successfully - waiting for updates...")
+        
+        # Giữ process running
+        while True:
+            time.sleep(1)
+            
     except Exception as e:
         logger.error(f"Failed to start bot: {e}", exc_info=True)
         raise
