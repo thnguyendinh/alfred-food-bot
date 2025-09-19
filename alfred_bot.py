@@ -419,7 +419,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    application = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).http_version("1.1").request_kwargs({'con_pool_size': 8, 'read_timeout': 10}).build()
     logger.info("Application built successfully")
 except Exception as e:
     logger.error(f"Failed to build application: {e}")
