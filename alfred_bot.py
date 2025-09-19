@@ -129,7 +129,8 @@ db = Database()
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
-    logger.info(f"Received /start from user {user_id} in chat {chat_id}")
+    logger.info(f"START HANDLER: Received /start from user {user_id}")
+    
     try:
         response = (
             "Xin chào! Mình là Alfred Food Bot.\n"
@@ -139,12 +140,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
             "- Gửi tên món: Tra thông tin chi tiết."
         )
+        
+        logger.info(f"START HANDLER: Attempting to reply to user {user_id}")
         await update.message.reply_text(response)
-        logger.info(f"Sent /start response to user {user_id}")
-    except TelegramError as te:
-        logger.error(f"Telegram error in /start: {te.message} (code: {getattr(te, 'status_code', 'unknown')})")
+        logger.info(f"START HANDLER: Successfully replied to user {user_id}")
+        
     except Exception as e:
-        logger.error(f"Failed to send /start response: {e}", exc_info=True)
+        logger.error(f"START HANDLER ERROR: {e}", exc_info=True)
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -369,11 +371,7 @@ def webhook():
         if update and update.message:
             logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
             
-            # Đảm bảo application đã initialized
-            if not application.initialized:
-                asyncio.run(application.initialize())
-                
-            # Xử lý update
+            # Xử lý update trực tiếp
             asyncio.run_coroutine_threadsafe(
                 application.process_update(update),
                 asyncio.get_event_loop()
@@ -386,7 +384,6 @@ def webhook():
     except Exception as e:
         logger.error(f"Webhook error: {e}", exc_info=True)
         return "Error", 500
-
 @flask_app.get("/")
 def index():
     return "Alfred Food Bot is running!", 200
@@ -400,7 +397,6 @@ async def set_webhook():
         logger.error(f"Failed to set webhook: {e}")
 
 # Main
-# Main
 if __name__ == "__main__":
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is not set")
@@ -413,10 +409,6 @@ if __name__ == "__main__":
     # Initialize and set webhook
     async def init_bot():
         try:
-            # Initialize application
-            await application.initialize()
-            logger.info("Application initialized successfully")
-            
             # Test bot token
             bot_info = await application.bot.get_me()
             logger.info(f"Bot info: {bot_info}")
@@ -432,5 +424,12 @@ if __name__ == "__main__":
             logger.error(f"Initialization error: {e}", exc_info=True)
             raise
     
-    asyncio.run(init_bot())
-    logger.info("Bot started successfully")
+    # Khởi tạo application
+    try:
+        # Initialize application (phiên bản 20.x không cần await initialize())
+        logger.info("Application starting...")
+        asyncio.run(init_bot())
+        logger.info("Bot started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}", exc_info=True)
+        raise
