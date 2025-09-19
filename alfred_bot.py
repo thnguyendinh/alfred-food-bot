@@ -1,53 +1,82 @@
 import os
-import json
-import random
 import logging
-import urllib.parse
-from datetime import datetime
-from typing import Dict, List, Any, Optional
-import requests
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, ConversationHandler
-)
+import random
+import asyncio
+import pg8000.native
+import sqlite3
 from flask import Flask, request
 
-# ===== CẤU HÌNH =====
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-RENDER = os.getenv("RENDER", False)
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
-DATABASE_URL = os.getenv("DATABASE_URL")
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 
-# Kiểm tra và import database driver
-USE_POSTGRES = False
-if DATABASE_URL and "postgres" in DATABASE_URL:
-    try:
-        import pg8000.native
-        USE_POSTGRES = True
-    except ImportError:
-        USE_POSTGRES = False
-        logging.warning("pg8000 not available, falling back to SQLite")
-
-# Fallback to SQLite
-if not USE_POSTGRES:
-    import sqlite3
-
-# Khởi tạo Flask app nếu dùng webhook
-if RENDER and WEBHOOK_URL:
-    app = Flask(__name__)
-
-# Thiết lập logging
+# Logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Trạng thái conversation
-SELECTING_ACTION, CHOOSING_TYPE, PROVIDING_LOCATION, GETTING_HISTORY = range(4)
+# Env variables
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
+PORT = int(os.getenv("PORT", 10000))  # Render default port
 
+# --------------------------------------------------------------------
+# Database
+class Database:
+    def __init__(self):
+        self.use_postgres = False
+        self.pg_conn = None
+        self.sqlite_conn = None
+        if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+            try:
+                self.pg_conn = pg8000.native.Connection(DATABASE_URL)
+                self.use_postgres = True
+                self.pg_conn.run("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT)")
+            except Exception as e:
+                logger.error(f"Postgres init failed: {e}")
+        else:
+            self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
+            self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT)")
+            self.sqlite_conn.commit()
+
+    def get_conn(self):
+        return self.pg_conn if self.use_postgres else self.sqlite_conn
+
+    def add_eaten(self, user_id, food):
+        conn = self.get_conn()
+        try:
+            if self.use_postgres:
+                conn.run("INSERT INTO eaten_foods (user_id, food) VALUES (:u, :f)", u=user_id, f=food)
+            else:
+                conn.execute("INSERT INTO eaten_foods (user_id, food) VALUES (?, ?)", (user_id, food))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"DB add error: {e}")
+
+    def get_eaten(self, user_id):
+        conn = self.get_conn()
+        try:
+            if self.use_postgres:
+                rows = conn.run("SELECT food FROM eaten_foods WHERE user_id=:u", u=user_id)
+                return [r[0] for r in rows]
+            else:
+                rows = conn.execute("SELECT food FROM eaten_foods WHERE user_id=?", (user_id,))
+                return [r[0] for r in rows.fetchall()]
+        except Exception as e:
+            logger.error(f"DB fetch error: {e}")
+            return []
+
+db = Database()
+
+# --------------------------------------------------------------------
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
     # ===== Miền Bắc =====
@@ -248,422 +277,59 @@ REGIONAL_FOODS = {
     "Vũng Tàu": ["bánh khọt Vũng Tàu", "hải sản Vũng Tàu"]
 }
 
-# ===== LỚP DATABASE =====
-class Database:
-    def __init__(self):
-        self.conn = None
-        self.connect()
-        self.create_tables()
-    
-    def connect(self):
-        """Kết nối đến database"""
-        try:
-            if USE_POSTGRES and DATABASE_URL:
-                # Parse connection string cho PostgreSQL
-                url = urllib.parse.urlparse(DATABASE_URL)
-                self.conn = pg8000.native.Connection(
-                    user=url.username,
-                    password=url.password,
-                    host=url.hostname,
-                    port=url.port,
-                    database=url.path[1:]  # Bỏ dấu / ở đầu
-                )
-                logger.info("Kết nối PostgreSQL thành công với pg8000")
-            else:
-                # Fallback to SQLite
-                db_path = '/tmp/alfred.db' if RENDER else 'alfred.db'
-                self.conn = sqlite3.connect(db_path, check_same_thread=False)
-                logger.info("Kết nối SQLite thành công")
-        except Exception as e:
-            logger.error(f"Lỗi kết nối database: {e}")
-            # Tạo SQLite connection như fallback
-            try:
-                db_path = '/tmp/alfred.db' if RENDER else 'alfred.db'
-                self.conn = sqlite3.connect(db_path, check_same_thread=False)
-                logger.info("Fallback SQLite connection thành công")
-            except Exception as e2:
-                logger.error(f"Lỗi fallback SQLite: {e2}")
-    
-    def create_tables(self):
-        """Tạo bảng nếu chưa tồn tại"""
-        if self.conn is None:
-            logger.error("Không thể tạo bảng: connection is None")
-            return
-            
-        try:
-            if USE_POSTGRES:
-                # Tạo bảng cho PostgreSQL
-                self.conn.run("""
-                    CREATE TABLE IF NOT EXISTS user_histories (
-                        id SERIAL PRIMARY KEY,
-                        user_id BIGINT NOT NULL,
-                        food TEXT NOT NULL,
-                        meal_type TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                self.conn.run("""
-                    CREATE TABLE IF NOT EXISTS user_preferences (
-                        user_id BIGINT PRIMARY KEY,
-                        preferences JSONB,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                self.conn.run("CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)")
-            else:
-                # Tạo bảng cho SQLite
-                cursor = self.conn.cursor()
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS user_histories (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        food TEXT NOT NULL,
-                        meal_type TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS user_preferences (
-                        user_id INTEGER PRIMARY KEY,
-                        preferences TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)')
-                self.conn.commit()
-                
-            logger.info("Tạo bảng thành công")
-        except Exception as e:
-            logger.error(f"Lỗi tạo bảng: {e}")
+# --------------------------------------------------------------------
+# Handlers
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Xin chào! Mình là Alfred Food Bot. Gõ /suggest để nhận gợi ý món ăn.")
 
-    def get_user_history(self, user_id: int) -> List[Dict]:
-        if self.conn is None:
-            return []
-            
-        try:
-            if USE_POSTGRES:
-                result = self.conn.run(
-                    "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10",
-                    user_id
-                )
-                return [{"food": row[0], "type": row[1], "date": row[2].isoformat()} for row in result]
-            else:
-                cursor = self.conn.cursor()
-                cursor.execute(
-                    "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
-                    (user_id,)
-                )
-                rows = cursor.fetchall()
-                return [{"food": row[0], "type": row[1], "date": row[2]} for row in rows]
-        except Exception as e:
-            logger.error(f"Lỗi get_user_history: {e}")
-            return []
+async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    eaten = db.get_eaten(user_id)
+    options = [f for f in FOODS.keys() if f not in eaten]
+    if not options:
+        options = list(FOODS.keys())
+    choice = random.choice(options)
+    db.add_eaten(user_id, choice)
+    await update.message.reply_text(f"Hôm nay bạn thử món: {choice}")
 
-    def add_to_history(self, user_id: int, food: str, meal_type: str = None):
-        if self.conn is None:
-            return
-            
-        try:
-            if USE_POSTGRES:
-                self.conn.run(
-                    "INSERT INTO user_histories (user_id, food, meal_type) VALUES ($1, $2, $3)",
-                    user_id, food, meal_type
-                )
-            else:
-                cursor = self.conn.cursor()
-                cursor.execute(
-                    "INSERT INTO user_histories (user_id, food, meal_type) VALUES (?, ?, ?)",
-                    (user_id, food, meal_type)
-                )
-                self.conn.commit()
-        except Exception as e:
-            logger.error(f"Lỗi add_to_history: {e}")
-
-    def get_user_preferences(self, user_id: int) -> Dict:
-        if self.conn is None:
-            return {}
-            
-        try:
-            if USE_POSTGRES:
-                result = self.conn.run(
-                    "SELECT preferences FROM user_preferences WHERE user_id = $1",
-                    user_id
-                )
-                if result and result[0]:
-                    return json.loads(result[0][0])
-            else:
-                cursor = self.conn.cursor()
-                cursor.execute(
-                    "SELECT preferences FROM user_preferences WHERE user_id = ?",
-                    (user_id,)
-                )
-                row = cursor.fetchone()
-                if row and row[0]:
-                    return json.loads(row[0])
-            return {}
-        except Exception as e:
-            logger.error(f"Lỗi get_user_preferences: {e}")
-            return {}
-
-    def save_user_preferences(self, user_id: int, preferences: Dict):
-        if self.conn is None:
-            return
-            
-        try:
-            preferences_json = json.dumps(preferences)
-            if USE_POSTGRES:
-                self.conn.run(
-                    """INSERT INTO user_preferences (user_id, preferences) 
-                       VALUES ($1, $2)
-                       ON CONFLICT (user_id) 
-                       DO UPDATE SET preferences = $2, updated_at = CURRENT_TIMESTAMP""",
-                    user_id, preferences_json
-                )
-            else:
-                cursor = self.conn.cursor()
-                cursor.execute(
-                    """INSERT OR REPLACE INTO user_preferences (user_id, preferences, updated_at) 
-                       VALUES (?, ?, CURRENT_TIMESTAMP)""",
-                    (user_id, preferences_json)
-                )
-                self.conn.commit()
-        except Exception as e:
-            logger.error(f"Lỗi save_user_preferences: {e}")
-
-# ===== LỚP FOOD ASSISTANT =====
-class FoodAssistant:
-    def __init__(self):
-        self.db = Database()
-        
-    def get_user_history(self, user_id: int) -> List[Dict]:
-        return self.db.get_user_history(user_id)
-    
-    def add_to_history(self, user_id: int, food: str, meal_type: str = None):
-        self.db.add_to_history(user_id, food, meal_type)
-    
-    def get_recent_foods(self, user_id: int, count: int = 3) -> List[str]:
-        history = self.get_user_history(user_id)
-        recent = history[:count] if len(history) >= count else history
-        return [item["food"] for item in recent]
-    
-    def filter_foods_by_type(self, food_type: str = None) -> List[str]:
-        if not food_type:
-            return list(VIETNAMESE_FOODS.keys())
-        return [food for food, details in VIETNAMESE_FOODS.items() 
-                if details["type"] == food_type]
-    
-    def get_regional_foods(self, region: str) -> List[str]:
-        return REGIONAL_FOODS.get(region, [])
-    
-    def suggest_food(self, user_id: int, preferences: Dict[str, Any]) -> str:
-        recent_foods = self.get_recent_foods(user_id, 3)
-        available_foods = self.filter_foods_by_type(preferences.get("type"))
-        
-        if preferences.get("region"):
-            regional_foods = self.get_regional_foods(preferences.get("region"))
-            available_foods = [f for f in available_foods if f in regional_foods]
-        
-        available_foods = [f for f in available_foods if f not in recent_foods]
-        
-        if not available_foods:
-            available_foods = list(VIETNAMESE_FOODS.keys())
-        
-        if available_foods:
-            selected_food = random.choice(available_foods)
-            self.add_to_history(user_id, selected_food, preferences.get("type"))
-            return selected_food
-        else:
-            return "Xin lỗi, không tìm thấy món ăn phù hợp."
-    
-    def get_food_info(self, food_name: str) -> Dict:
-        if food_name in VIETNAMESE_FOODS:
-            info = VIETNAMESE_FOODS[food_name].copy()
-            info["name"] = food_name
-            return info
-        
-        return {
-            "name": food_name,
-            "type": "không xác định",
-            "category": "không xác định",
-            "ingredients": ["không xác định"],
-            "recipe": "Công thức không có sẵn.",
-            "popular_regions": ["không xác định"],
-            "holidays": ["không xác định"]
-        }
-
-# ===== HANDLERS =====
-food_bot = FoodAssistant()
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    await update.message.reply_text(
-        f"Xin chào {user.first_name}! Tôi là Alfred, trợ lý ẩm thực Việt Nam.\n\n"
-        "Gõ /suggest để nhận gợi ý món ăn!",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return SELECTING_ACTION
-
-async def suggest_food(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.message.from_user.id
-    history = food_bot.get_user_history(user_id)
-    
-    if history:
-        recent_foods = food_bot.get_recent_foods(user_id, 3)
-        await update.message.reply_text(
-            f"Bạn đã ăn: {', '.join(recent_foods)}.\nTôi sẽ tránh gợi ý những món này.\n\n"
-            "Bạn muốn ăn món khô hay món nước?",
-            reply_markup=ReplyKeyboardMarkup([["Khô", "Nước", "Cả hai"]], one_time_keyboard=True)
-        )
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.lower()
+    if text in FOODS:
+        await update.message.reply_text(f"{text} là món nổi tiếng vùng {FOODS[text]['region']}")
     else:
-        await update.message.reply_text(
-            "Bạn muốn ăn món khô hay món nước?",
-            reply_markup=ReplyKeyboardMarkup([["Khô", "Nước", "Cả hai"]], one_time_keyboard=True)
-        )
-    return CHOOSING_TYPE
+        await update.message.reply_text("Mình chưa có thông tin món này.")
 
-async def handle_food_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.message.from_user.id
-    food_type = update.message.text.lower()
-    
-    if user_id not in context.user_data:
-        context.user_data[user_id] = {}
-    
-    if food_type == "khô":
-        context.user_data[user_id]["type"] = "khô"
-    elif food_type == "nước":
-        context.user_data[user_id]["type"] = "nước"
-    else:
-        context.user_data[user_id]["type"] = None
-    
-    await update.message.reply_text(
-        "Bạn có đang ở địa phương nào không? (ví dụ: Hà Nội, Huế, Sài Gòn...)\n"
-        "Nếu không, gõ 'không'.",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return PROVIDING_LOCATION
+# --------------------------------------------------------------------
+# Build Application
+application = ApplicationBuilder().token(TOKEN).build()
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("suggest", suggest))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.message.from_user.id
-    location = update.message.text
-    
-    preferences = context.user_data.get(user_id, {})
-    if location.lower() != "không":
-        preferences["region"] = location
-    
-    suggested_food = food_bot.suggest_food(user_id, preferences)
-    food_info = food_bot.get_food_info(suggested_food)
-    
-    response = f"Gợi ý: {suggested_food}\n\n"
-    response += f"Loại: {food_info['type']}\n"
-    response += f"Phân loại: {food_info['category']}\n"
-    response += f"Nguyên liệu: {', '.join(food_info['ingredients'][:3])}\n"
-    response += f"Vùng miền: {', '.join(food_info['popular_regions'])}\n\n"
-    response += "Bạn có muốn xem công thức nấu không? (có/không)"
-    
-    context.user_data["last_suggestion"] = suggested_food
-    await update.message.reply_text(response)
-    return GETTING_HISTORY
+# --------------------------------------------------------------------
+# Flask app for Render webhook
+flask_app = Flask(__name__)
 
-async def handle_recipe_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_response = update.message.text.lower()
-    
-    if user_response == "có":
-        suggested_food = context.user_data.get("last_suggestion", "")
-        food_info = food_bot.get_food_info(suggested_food)
-        await update.message.reply_text(f"Công thức {suggested_food}:\n\n{food_info['recipe']}")
-    
-    await update.message.reply_text(
-        "Cảm ơn bạn! Gõ /suggest để nhận gợi ý món ăn khác.",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return SELECTING_ACTION
+@flask_app.post(f"/webhook/{TOKEN}")
+async def webhook() -> str:
+    try:
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        await application.process_update(update)
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+    return "ok"
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.message.reply_text("Tạm biệt!", reply_markup=ReplyKeyboardRemove())
-    return ConversationHandler.END
+@flask_app.get("/")
+def index():
+    return "Alfred Food Bot running!"
 
-async def food_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Vui lòng nhập tên món ăn. Ví dụ: /info phở")
-        return
-    
-    food_name = " ".join(context.args)
-    food_info = food_bot.get_food_info(food_name)
-    
-    response = f"Thông tin {food_info['name']}:\n\n"
-    response += f"Loại: {food_info['type']}\n"
-    response += f"Phân loại: {food_info['category']}\n"
-    response += f"Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
-    response += f"Vùng miền: {', '.join(food_info['popular_regions'])}\n\n"
-    response += f"Công thức: {food_info['recipe']}"
-    
-    await update.message.reply_text(response)
-
-async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    history = food_bot.get_user_history(user_id)
-    
-    if not history:
-        await update.message.reply_text("Bạn chưa có lịch sử món ăn.")
-        return
-    
-    response = "Lịch sử món ăn gần đây:\n\n"
-    for i, item in enumerate(history[:5], 1):
-        response += f"{i}. {item['food']} ({item['date'][:10]})\n"
-    
-    await update.message.reply_text(response)
-
-# ===== MAIN =====
-def main() -> None:
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN không được thiết lập!")
-        return
-    
-    # Tạo application với các tham số đúng
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            SELECTING_ACTION: [CommandHandler("suggest", suggest_food)],
-            CHOOSING_TYPE: [MessageHandler(filters.Regex("^(Khô|Nước|Cả hai)$"), handle_food_type)],
-            PROVIDING_LOCATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_location)],
-            GETTING_HISTORY: [MessageHandler(filters.Regex("^(có|không)$"), handle_recipe_request)]
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-
-    application.add_handler(conv_handler)
-    application.add_handler(CommandHandler("info", food_info))
-    application.add_handler(CommandHandler("history", history))
-
-    if RENDER and WEBHOOK_URL:
-        @app.route('/webhook', methods=['POST'])
-        def webhook():
-            update = Update.de_json(request.get_json(), application.bot)
-            application.update_queue.put(update)
-            return 'ok'
-        
-        @app.route('/')
-        def index():
-            return 'Alfred Food Bot is running!'
-        
-        # Sửa lỗi run_webhook
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.environ.get("PORT", 5000)),
-            webhook_url=WEBHOOK_URL,
-            secret_token='WEBHOOK_SECRET'  # Thêm secret token
-        )
-    else:
-        # Sửa lỗi polling
-        application.run_polling(
-            drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES
-        )
-        print("Bot đang chạy...")
-
+# --------------------------------------------------------------------
+# Main
 if __name__ == "__main__":
-    main()
+    # Đặt webhook khi start
+    if WEBHOOK_URL:
+        async def set_webhook():
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook/{TOKEN}")
+        asyncio.get_event_loop().run_until_complete(set_webhook())
+
+    flask_app.run(host="0.0.0.0", port=PORT)
