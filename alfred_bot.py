@@ -2,8 +2,7 @@ import os
 import json
 import random
 import logging
-import psycopg2
-import psycopg2.extras
+import urllib.parse
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import requests
