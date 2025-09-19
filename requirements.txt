@@ -4,4 +4,4 @@ gunicorn==22.0.0  # Keep for compatibility, but we'll use Uvicorn
 uvicorn==0.30.6  # ASGI server for async Flask
 pg8000==1.31.2
 httpcore==0.18.0  # Pin để tương thích
-anyio==3.7.1  # Pin để fix bug loop closed
+
