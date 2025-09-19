@@ -357,23 +357,17 @@ def webhook():
         if update and update.message:
             logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
             
-            # Xử lý sync đơn giản
-            import threading
-            def process_update_sync():
-                try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(application.process_update(update))
-                    loop.close()
-                    logger.info(f"Successfully processed update: {update.update_id}")
-                except Exception as e:
-                    logger.error(f"Error processing update: {e}")
+            # Xử lý update TRỰC TIẾP - không dùng asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             
-            # Chạy trong thread riêng
-            thread = threading.Thread(target=process_update_sync)
-            thread.start()
-            
-            return "ok", 200
+            try:
+                loop.run_until_complete(application.process_update(update))
+                logger.info(f"Successfully processed update: {update.update_id}")
+                return "ok", 200
+            finally:
+                loop.close()
+                
         else:
             logger.warning("Invalid update format")
             return "Invalid update", 400
@@ -381,10 +375,6 @@ def webhook():
     except Exception as e:
         logger.error(f"Webhook error: {e}", exc_info=True)
         return "Error", 500
-
-@flask_app.get("/")
-def index():
-    return "Alfred Food Bot is running!", 200
 
 # Set webhook on startup
 async def set_webhook():
