@@ -114,6 +114,7 @@ db = Database()
 # --------------------------------------------------------------------
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
+    # Miền Bắc
     "phở": {
         "type": "nước", "category": "phở",
         "ingredients": ["bánh phở", "thịt bò/gà", "xương hầm", "hành", "rau thơm"],
@@ -156,6 +157,8 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Hải Phòng"],
         "holidays": ["Bữa trưa"]
     },
+
+    # Miền Trung
     "bún bò Huế": {
         "type": "nước", "category": "bún",
         "ingredients": ["bún", "thịt bò", "giò heo", "mắm ruốc"],
@@ -205,6 +208,8 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Hội An", "Quảng Nam"],
         "holidays": ["Du lịch"]
     },
+
+    # Miền Nam
     "cơm tấm": {
         "type": "khô", "category": "cơm",
         "ingredients": ["gạo tấm", "sườn nướng", "bì", "chả trứng"],
@@ -386,8 +391,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    if not asyncio.get_event_loop().run_until_complete(validate_token()):
-        raise ValueError("Invalid bot token")
     application = ApplicationBuilder().token(TOKEN).build()
     logger.info("Application built successfully")
 except Exception as e:
@@ -398,6 +401,11 @@ application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("suggest", suggest))
 application.add_handler(CommandHandler("region", region_suggest))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+# Initialize application
+logger.info("Initializing application...")
+asyncio.get_event_loop().run_until_complete(application.initialize())
+logger.info("Application initialized successfully")
 
 # --------------------------------------------------------------------
 # Flask app for Render webhook
