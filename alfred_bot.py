@@ -93,9 +93,9 @@ class Database:
 db = Database()
 
 # --------------------------------------------------------------------
-# ===== CƠ SỞ DỮ LIỆU MÓN ĂN ===== (Giữ nguyên + cập nhật thêm)
+# ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
-    # Miền Bắc (thêm "bánh đa cua")
+    # Miền Bắc
     "phở": {
         "type": "nước", "category": "phở",
         "ingredients": ["bánh phở", "thịt bò/gà", "xương hầm", "hành", "rau thơm"],
@@ -131,7 +131,7 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Bắc Bộ"],
         "holidays": ["Mọi dịp"]
     },
-    "bánh đa cua": {  # Mới thêm
+    "bánh đa cua": {
         "type": "nước", "category": "bánh đa",
         "ingredients": ["bánh đa", "cua đồng", "rau sống", "gia vị"],
         "recipe": "Nấu nước dùng từ cua đồng, thêm bánh đa và rau.",
@@ -139,7 +139,7 @@ VIETNAMESE_FOODS = {
         "holidays": ["Bữa trưa"]
     },
 
-    # Miền Trung (thêm "cao lầu")
+    # Miền Trung
     "bún bò Huế": {
         "type": "nước", "category": "bún",
         "ingredients": ["bún", "thịt bò", "giò heo", "mắm ruốc"],
@@ -182,7 +182,7 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Đà Nẵng"],
         "holidays": ["Mọi dịp"]
     },
-    "cao lầu": {  # Mới thêm
+    "cao lầu": {
         "type": "khô", "category": "mì",
         "ingredients": ["sợi cao lầu", "thịt xá xíu", "rau sống", "da heo chiên"],
         "recipe": "Nấu sợi mì dai từ nước tro tàu, thêm thịt và rau.",
@@ -190,7 +190,7 @@ VIETNAMESE_FOODS = {
         "holidays": ["Du lịch"]
     },
 
-    # Miền Nam (thêm "bánh canh")
+    # Miền Nam
     "cơm tấm": {
         "type": "khô", "category": "cơm",
         "ingredients": ["gạo tấm", "sườn nướng", "bì", "chả trứng"],
@@ -261,7 +261,7 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Nam Bộ"],
         "holidays": ["Tết Hàn Thực", "Ngày thường"]
     },
-    "bánh canh": {  # Mới thêm
+    "bánh canh": {
         "type": "nước", "category": "bánh canh",
         "ingredients": ["bánh canh", "tôm", "cá", "rau thơm"],
         "recipe": "Nấu nước dùng từ xương, thêm bánh canh và topping.",
@@ -279,13 +279,11 @@ REGIONAL_FOODS = {
     "Ninh Bình": ["cơm cháy Ninh Bình", "dê núi Ninh Bình"],
     "Thái Bình": ["bánh cáy", "canh cá rô đồng"],
     "Lạng Sơn": ["vịt quay Lạng Sơn", "khâu nhục"],
-
     # Bắc Trung Bộ
     "Thanh Hóa": ["nem chua Thanh Hóa", "chè lam Phủ Quảng"],
     "Nghệ An": ["cháo lươn Nghệ An", "mực nhảy Cửa Lò"],
     "Hà Tĩnh": ["ram bánh mướt", "cháo canh Hà Tĩnh"],
     "Huế": ["bún bò Huế", "cơm hến", "bánh bèo", "bánh nậm", "bánh lọc"],
-
     # Duyên hải Nam Trung Bộ
     "Đà Nẵng": ["mì quảng", "bánh xèo", "bún chả cá"],
     "Quảng Nam": ["cao lầu Hội An", "mì Quảng gà", "bánh bao bánh vạc"],
@@ -295,13 +293,11 @@ REGIONAL_FOODS = {
     "Khánh Hòa": ["nem nướng Nha Trang", "bún sứa", "yến sào"],
     "Ninh Thuận": ["nho Ninh Thuận", "thịt cừu nướng"],
     "Bình Thuận": ["bánh canh chả cá Phan Thiết", "dông nướng", "thanh long"],
-
     # Tây Nguyên
     "Gia Lai": ["phở khô Gia Lai (phở hai tô)"],
     "Đắk Lắk": ["cà phê Buôn Ma Thuột", "bún đỏ"],
     "Kon Tum": ["gỏi lá Kon Tum"],
     "Lâm Đồng": ["lẩu gà lá é", "dâu tây Đà Lạt"],
-
     # Nam Bộ
     "Sài Gòn": ["cơm tấm", "hủ tiếu", "bánh mì", "gỏi cuốn", "bánh khọt"],
     "Cần Thơ": ["lẩu mắm", "ốc nướng tiêu xanh", "bánh xèo miền Tây"],
@@ -317,7 +313,12 @@ REGIONAL_FOODS = {
 # --------------------------------------------------------------------
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Xin chào! Mình là Alfred Food Bot. \n- /suggest: Gợi ý món ăn ngẫu nhiên.\n- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n- Gửi tên món: Tra thông tin chi tiết.")
+    await update.message.reply_text(
+        "Xin chào! Mình là Alfred Food Bot.\n"
+        "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
+        "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
+        "- Gửi tên món: Tra thông tin chi tiết."
+    )
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -403,13 +404,17 @@ if __name__ == "__main__":
         logger.error("TELEGRAM_BOT_TOKEN is not set")
         raise ValueError("TELEGRAM_BOT_TOKEN is not set")
     
-    if WEBHOOK_URL:
-        async def set_webhook():
-            try:
-                await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-                logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-            except Exception as e:
-                logger.error(f"Failed to set webhook: {e}")
-        asyncio.get_event_loop().run_until_complete(set_webhook())
+    if not WEBHOOK_URL:
+        logger.error("WEBHOOK_URL is not set")
+        raise ValueError("WEBHOOK_URL is not set")
     
+    async def set_webhook():
+        try:
+            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+        except Exception as e:
+            logger.error(f"Failed to set webhook: {e}")
+            raise
+    
+    asyncio.get_event_loop().run_until_complete(set_webhook())
     flask_app.run(host="0.0.0.0", port=PORT)
