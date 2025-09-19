@@ -357,11 +357,22 @@ def webhook():
         if update and update.message:
             logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
             
-            # Xử lý update qua application
-            asyncio.run_coroutine_threadsafe(
-                application.process_update(update),
-                asyncio.get_event_loop()
-            )
+            # Xử lý sync đơn giản
+            import threading
+            def process_update_sync():
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(application.process_update(update))
+                    loop.close()
+                    logger.info(f"Successfully processed update: {update.update_id}")
+                except Exception as e:
+                    logger.error(f"Error processing update: {e}")
+            
+            # Chạy trong thread riêng
+            thread = threading.Thread(target=process_update_sync)
+            thread.start()
+            
             return "ok", 200
         else:
             logger.warning("Invalid update format")
