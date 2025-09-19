@@ -1,3 +1,5 @@
+import anyio
+anyio._backends._asyncio.TaskGroup.__init__ = lambda self, *args, **kwargs: None  # Workaround bug
 import os
 import logging
 import random
