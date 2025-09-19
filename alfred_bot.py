@@ -93,9 +93,9 @@ class Database:
 db = Database()
 
 # --------------------------------------------------------------------
-# ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
+# ===== CƠ SỞ DỮ LIỆU MÓN ĂN ===== (Giữ nguyên + cập nhật thêm)
 VIETNAMESE_FOODS = {
-    # Miền Bắc
+    # Miền Bắc (thêm "bánh đa cua")
     "phở": {
         "type": "nước", "category": "phở",
         "ingredients": ["bánh phở", "thịt bò/gà", "xương hầm", "hành", "rau thơm"],
@@ -131,7 +131,15 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Bắc Bộ"],
         "holidays": ["Mọi dịp"]
     },
-    # Miền Trung
+    "bánh đa cua": {  # Mới thêm
+        "type": "nước", "category": "bánh đa",
+        "ingredients": ["bánh đa", "cua đồng", "rau sống", "gia vị"],
+        "recipe": "Nấu nước dùng từ cua đồng, thêm bánh đa và rau.",
+        "popular_regions": ["Hải Phòng"],
+        "holidays": ["Bữa trưa"]
+    },
+
+    # Miền Trung (thêm "cao lầu")
     "bún bò Huế": {
         "type": "nước", "category": "bún",
         "ingredients": ["bún", "thịt bò", "giò heo", "mắm ruốc"],
@@ -174,7 +182,15 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Đà Nẵng"],
         "holidays": ["Mọi dịp"]
     },
-    # Miền Nam
+    "cao lầu": {  # Mới thêm
+        "type": "khô", "category": "mì",
+        "ingredients": ["sợi cao lầu", "thịt xá xíu", "rau sống", "da heo chiên"],
+        "recipe": "Nấu sợi mì dai từ nước tro tàu, thêm thịt và rau.",
+        "popular_regions": ["Hội An", "Quảng Nam"],
+        "holidays": ["Du lịch"]
+    },
+
+    # Miền Nam (thêm "bánh canh")
     "cơm tấm": {
         "type": "khô", "category": "cơm",
         "ingredients": ["gạo tấm", "sườn nướng", "bì", "chả trứng"],
@@ -244,6 +260,13 @@ VIETNAMESE_FOODS = {
         "recipe": "Vo viên bột nếp nhân đậu xanh, luộc chín, chan nước gừng ngọt.",
         "popular_regions": ["Nam Bộ"],
         "holidays": ["Tết Hàn Thực", "Ngày thường"]
+    },
+    "bánh canh": {  # Mới thêm
+        "type": "nước", "category": "bánh canh",
+        "ingredients": ["bánh canh", "tôm", "cá", "rau thơm"],
+        "recipe": "Nấu nước dùng từ xương, thêm bánh canh và topping.",
+        "popular_regions": ["Sài Gòn", "Miền Tây"],
+        "holidays": ["Bữa tối"]
     }
 }
 
@@ -256,11 +279,13 @@ REGIONAL_FOODS = {
     "Ninh Bình": ["cơm cháy Ninh Bình", "dê núi Ninh Bình"],
     "Thái Bình": ["bánh cáy", "canh cá rô đồng"],
     "Lạng Sơn": ["vịt quay Lạng Sơn", "khâu nhục"],
+
     # Bắc Trung Bộ
     "Thanh Hóa": ["nem chua Thanh Hóa", "chè lam Phủ Quảng"],
     "Nghệ An": ["cháo lươn Nghệ An", "mực nhảy Cửa Lò"],
     "Hà Tĩnh": ["ram bánh mướt", "cháo canh Hà Tĩnh"],
     "Huế": ["bún bò Huế", "cơm hến", "bánh bèo", "bánh nậm", "bánh lọc"],
+
     # Duyên hải Nam Trung Bộ
     "Đà Nẵng": ["mì quảng", "bánh xèo", "bún chả cá"],
     "Quảng Nam": ["cao lầu Hội An", "mì Quảng gà", "bánh bao bánh vạc"],
@@ -270,11 +295,13 @@ REGIONAL_FOODS = {
     "Khánh Hòa": ["nem nướng Nha Trang", "bún sứa", "yến sào"],
     "Ninh Thuận": ["nho Ninh Thuận", "thịt cừu nướng"],
     "Bình Thuận": ["bánh canh chả cá Phan Thiết", "dông nướng", "thanh long"],
+
     # Tây Nguyên
     "Gia Lai": ["phở khô Gia Lai (phở hai tô)"],
     "Đắk Lắk": ["cà phê Buôn Ma Thuột", "bún đỏ"],
     "Kon Tum": ["gỏi lá Kon Tum"],
     "Lâm Đồng": ["lẩu gà lá é", "dâu tây Đà Lạt"],
+
     # Nam Bộ
     "Sài Gòn": ["cơm tấm", "hủ tiếu", "bánh mì", "gỏi cuốn", "bánh khọt"],
     "Cần Thơ": ["lẩu mắm", "ốc nướng tiêu xanh", "bánh xèo miền Tây"],
@@ -290,7 +317,7 @@ REGIONAL_FOODS = {
 # --------------------------------------------------------------------
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Xin chào! Mình là Alfred Food Bot. Gõ /suggest để nhận gợi ý món ăn.")
+    await update.message.reply_text("Xin chào! Mình là Alfred Food Bot. \n- /suggest: Gợi ý món ăn ngẫu nhiên.\n- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n- Gửi tên món: Tra thông tin chi tiết.")
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -311,6 +338,18 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(response, parse_mode="Markdown")
 
+async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.args:
+        region = ' '.join(context.args).title()  # Ví dụ: "Hà Nội"
+        if region in REGIONAL_FOODS:
+            foods = REGIONAL_FOODS[region]
+            response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
+            await update.message.reply_text(response, parse_mode="Markdown")
+        else:
+            await update.message.reply_text(f"Không tìm thấy vùng '{region}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
+    else:
+        await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
+
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     if text in VIETNAMESE_FOODS:
@@ -318,17 +357,21 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = (
             f"{text} là món ăn nổi tiếng!\n"
             f"- Loại: {food_info['type']}\n"
-            f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}"
+            f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
+            f"- Cách làm: {food_info['recipe']}\n"
+            f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
+            f"- Dịp: {', '.join(food_info['holidays'])}"
         )
         await update.message.reply_text(response)
     else:
-        await update.message.reply_text("Mình chưa có thông tin món này.")
+        await update.message.reply_text("Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!")
 
 # --------------------------------------------------------------------
 # Build Application
 application = ApplicationBuilder().token(TOKEN).build()
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("suggest", suggest))
+application.add_handler(CommandHandler("region", region_suggest))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 # --------------------------------------------------------------------
