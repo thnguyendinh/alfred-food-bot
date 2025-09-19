@@ -46,7 +46,7 @@ async def validate_token():
         logger.info(f"Bot token is valid: {bot_info}")
         return True
     except TelegramError as te:
-        logger.error(f"Invalid bot token: {te.message}")
+        logger.error(f"Invalid bot token: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
         return False
     except Exception as e:
         logger.error(f"Error validating token: {e}")
@@ -123,6 +123,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /start from user {user_id}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         response = (
             "Xin chào! Mình là Alfred Food Bot.\n"
             "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
@@ -142,6 +145,9 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /suggest from user {user_id}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         eaten = db.get_eaten(user_id)
         options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
         if not options:
@@ -169,6 +175,9 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /region from user {user_id} with args: {context.args}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if context.args:
             user_input = ' '.join(context.args)
             def normalize_string(s):
@@ -217,6 +226,9 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = str(update.effective_user.id)
     logger.info(f"Received /ingredient from user {user_id} with args: {context.args}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if context.args:
             user_ingredients = [ing.lower() for ing in ' '.join(context.args).split(',')]
             matching_foods = []
@@ -252,6 +264,9 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /location from user {user_id}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         sent_message = await update.message.reply_text("Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu).")
         logger.info(f"Sent /location response to user {user_id}: message_id={sent_message.message_id}")
     except TelegramError as te:
@@ -264,6 +279,9 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.location
     logger.info(f"Received location from user {user_id}: {location.latitude if location else None}, {location.longitude if location else None}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if location:
             region = "Sài Gòn"  # Giả lập, cần API geocode để thực tế
             foods = REGIONAL_FOODS.get(region, [])
@@ -287,6 +305,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     logger.info(f"Received text '{text}' from user {user_id}")
     try:
+        # Check chat permissions
+        chat = await context.bot.get_chat(update.effective_chat.id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if text in VIETNAMESE_FOODS:
             food_info = VIETNAMESE_FOODS[text]
             response = (
@@ -311,7 +332,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    application = ApplicationBuilder().token(TOKEN).http_version("1.1").build()
+    application = ApplicationBuilder().token(TOKEN).http_version="1.1").build()
     logger.info("Application built successfully")
 except Exception as e:
     logger.error(f"Failed to build application: {e}")
