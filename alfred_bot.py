@@ -340,14 +340,30 @@ flask_app = Flask(__name__)
 @flask_app.post("/webhook")
 def webhook():
     try:
-        update = Update.de_json(request.get_json(), application.bot)
-        asyncio.run_coroutine_threadsafe(
-            application.process_update(update),
-            asyncio.get_event_loop()
-        )
-        return "ok", 200
+        # Nhận và parse update
+        update_data = request.get_json()
+        logger.info(f"Received webhook update: {update_data}")
+        
+        if not update_data:
+            logger.warning("Empty update received")
+            return "Empty update", 400
+            
+        update = Update.de_json(update_data, application.bot)
+        
+        # Xử lý update
+        if update and update.message:
+            logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
+            asyncio.run_coroutine_threadsafe(
+                application.process_update(update),
+                asyncio.get_event_loop()
+            )
+            return "ok", 200
+        else:
+            logger.warning("Invalid update format")
+            return "Invalid update", 400
+            
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.error(f"Webhook error: {e}", exc_info=True)
         return "Error", 500
 
 @flask_app.get("/")
@@ -363,6 +379,7 @@ async def set_webhook():
         logger.error(f"Failed to set webhook: {e}")
 
 # Main
+# Main
 if __name__ == "__main__":
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is not set")
@@ -373,5 +390,22 @@ if __name__ == "__main__":
         raise ValueError("WEBHOOK_URL is not set")
     
     # Initialize and set webhook
-    asyncio.run(set_webhook())
+    async def init_bot():
+        try:
+            # Test bot token
+            bot_info = await application.bot.get_me()
+            logger.info(f"Bot info: {bot_info}")
+            
+            # Set webhook
+            await set_webhook()
+            
+            # Check webhook info
+            webhook_info = await application.bot.get_webhook_info()
+            logger.info(f"Webhook info: {webhook_info}")
+            
+        except Exception as e:
+            logger.error(f"Initialization error: {e}")
+            raise
+    
+    asyncio.run(init_bot())
     logger.info("Bot started successfully")
