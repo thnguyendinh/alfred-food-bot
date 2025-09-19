@@ -1,8 +1,7 @@
 python-telegram-bot==22.4
-flask[async]==2.3.3  # Adds 'async' extra for async support
-gunicorn==22.0.0  # Keep for compatibility, but we'll use Uvicorn
-uvicorn==0.30.6  # ASGI server for async Flask
 pg8000==1.31.2
+flask==2.3.3
+gunicorn==22.0.0
 anyio==3.7.1
 
 
