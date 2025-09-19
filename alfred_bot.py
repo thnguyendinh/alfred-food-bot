@@ -2,10 +2,10 @@ import os
 import logging
 import random
 import asyncio
+import urllib.parse
 import pg8000.native
 import sqlite3
 from flask import Flask, request
-
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -37,15 +37,31 @@ class Database:
         self.sqlite_conn = None
         if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
             try:
-                self.pg_conn = pg8000.native.Connection(DATABASE_URL)
+                # Parse DATABASE_URL
+                parsed = urllib.parse.urlparse(DATABASE_URL)
+                db_params = {
+                    "user": parsed.username,
+                    "password": parsed.password,
+                    "host": parsed.hostname,
+                    "port": parsed.port,
+                    "database": parsed.path.lstrip('/')
+                }
+                self.pg_conn = pg8000.native.Connection(**db_params)
                 self.use_postgres = True
                 self.pg_conn.run("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT)")
             except Exception as e:
-                logger.error(f"Postgres init failed: {e}")
+                logger.error(f"Postgres init failed: {e}. Falling back to SQLite.")
+                self._init_sqlite()
         else:
+            self._init_sqlite()
+
+    def _init_sqlite(self):
+        try:
             self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
             self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT)")
             self.sqlite_conn.commit()
+        except Exception as e:
+            logger.error(f"SQLite init failed: {e}")
 
     def get_conn(self):
         return self.pg_conn if self.use_postgres else self.sqlite_conn
@@ -79,7 +95,7 @@ db = Database()
 # --------------------------------------------------------------------
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
-    # ===== Miền Bắc =====
+    # Miền Bắc
     "phở": {
         "type": "nước", "category": "phở",
         "ingredients": ["bánh phở", "thịt bò/gà", "xương hầm", "hành", "rau thơm"],
@@ -115,8 +131,7 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Bắc Bộ"],
         "holidays": ["Mọi dịp"]
     },
-
-    # ===== Miền Trung =====
+    # Miền Trung
     "bún bò Huế": {
         "type": "nước", "category": "bún",
         "ingredients": ["bún", "thịt bò", "giò heo", "mắm ruốc"],
@@ -159,8 +174,7 @@ VIETNAMESE_FOODS = {
         "popular_regions": ["Đà Nẵng"],
         "holidays": ["Mọi dịp"]
     },
-
-    # ===== Miền Nam =====
+    # Miền Nam
     "cơm tấm": {
         "type": "khô", "category": "cơm",
         "ingredients": ["gạo tấm", "sườn nướng", "bì", "chả trứng"],
@@ -171,7 +185,7 @@ VIETNAMESE_FOODS = {
     "hủ tiếu": {
         "type": "nước", "category": "hủ tiếu",
         "ingredients": ["hủ tiếu", "thịt", "tôm", "trứng cút"],
-        "recipe": "Nấu nước hầm xương, chan lên h�ủ tiếu.",
+        "recipe": "Nấu nước hầm xương, chan lên hủ tiếu.",
         "popular_regions": ["Sài Gòn", "Miền Tây"],
         "holidays": ["Bữa sáng"]
     },
@@ -234,7 +248,7 @@ VIETNAMESE_FOODS = {
 }
 
 REGIONAL_FOODS = {
-    # ===== Bắc Bộ =====
+    # Bắc Bộ
     "Hà Nội": ["phở", "bún chả", "bún đậu mắm tôm", "bánh cuốn", "cháo lòng"],
     "Hải Phòng": ["bánh đa cua", "nem cua bể", "lẩu cua đồng"],
     "Quảng Ninh": ["cháo hà", "sá sùng nướng", "sam biển"],
@@ -242,14 +256,12 @@ REGIONAL_FOODS = {
     "Ninh Bình": ["cơm cháy Ninh Bình", "dê núi Ninh Bình"],
     "Thái Bình": ["bánh cáy", "canh cá rô đồng"],
     "Lạng Sơn": ["vịt quay Lạng Sơn", "khâu nhục"],
-
-    # ===== Bắc Trung Bộ =====
+    # Bắc Trung Bộ
     "Thanh Hóa": ["nem chua Thanh Hóa", "chè lam Phủ Quảng"],
     "Nghệ An": ["cháo lươn Nghệ An", "mực nhảy Cửa Lò"],
     "Hà Tĩnh": ["ram bánh mướt", "cháo canh Hà Tĩnh"],
     "Huế": ["bún bò Huế", "cơm hến", "bánh bèo", "bánh nậm", "bánh lọc"],
-
-    # ===== Duyên hải Nam Trung Bộ =====
+    # Duyên hải Nam Trung Bộ
     "Đà Nẵng": ["mì quảng", "bánh xèo", "bún chả cá"],
     "Quảng Nam": ["cao lầu Hội An", "mì Quảng gà", "bánh bao bánh vạc"],
     "Quảng Ngãi": ["don Quảng Ngãi", "ram bắp"],
@@ -258,14 +270,12 @@ REGIONAL_FOODS = {
     "Khánh Hòa": ["nem nướng Nha Trang", "bún sứa", "yến sào"],
     "Ninh Thuận": ["nho Ninh Thuận", "thịt cừu nướng"],
     "Bình Thuận": ["bánh canh chả cá Phan Thiết", "dông nướng", "thanh long"],
-
-    # ===== Tây Nguyên =====
+    # Tây Nguyên
     "Gia Lai": ["phở khô Gia Lai (phở hai tô)"],
     "Đắk Lắk": ["cà phê Buôn Ma Thuột", "bún đỏ"],
     "Kon Tum": ["gỏi lá Kon Tum"],
     "Lâm Đồng": ["lẩu gà lá é", "dâu tây Đà Lạt"],
-
-    # ===== Nam Bộ =====
+    # Nam Bộ
     "Sài Gòn": ["cơm tấm", "hủ tiếu", "bánh mì", "gỏi cuốn", "bánh khọt"],
     "Cần Thơ": ["lẩu mắm", "ốc nướng tiêu xanh", "bánh xèo miền Tây"],
     "An Giang": ["gỏi sầu đâu", "mắm Châu Đốc", "bò bảy món"],
@@ -285,17 +295,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     eaten = db.get_eaten(user_id)
-    options = [f for f in FOODS.keys() if f not in eaten]
+    options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
     if not options:
-        options = list(FOODS.keys())
+        options = list(VIETNAMESE_FOODS.keys())
     choice = random.choice(options)
     db.add_eaten(user_id, choice)
-    await update.message.reply_text(f"Hôm nay bạn thử món: {choice}")
+    food_info = VIETNAMESE_FOODS[choice]
+    response = (
+        f"Hôm nay bạn thử món: *{choice}*\n"
+        f"- Loại: {food_info['type']}\n"
+        f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
+        f"- Cách làm: {food_info['recipe']}\n"
+        f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
+        f"- Dịp: {', '.join(food_info['holidays'])}"
+    )
+    await update.message.reply_text(response, parse_mode="Markdown")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
-    if text in FOODS:
-        await update.message.reply_text(f"{text} là món nổi tiếng vùng {FOODS[text]['region']}")
+    if text in VIETNAMESE_FOODS:
+        food_info = VIETNAMESE_FOODS[text]
+        response = (
+            f"{text} là món ăn nổi tiếng!\n"
+            f"- Loại: {food_info['type']}\n"
+            f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}"
+        )
+        await update.message.reply_text(response)
     else:
         await update.message.reply_text("Mình chưa có thông tin món này.")
 
@@ -310,26 +335,38 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 # Flask app for Render webhook
 flask_app = Flask(__name__)
 
-@flask_app.post(f"/webhook/{TOKEN}")
-async def webhook() -> str:
+@flask_app.route("/webhook", methods=["POST"])
+async def webhook():
     try:
         update = Update.de_json(request.get_json(force=True), application.bot)
-        await application.process_update(update)
+        if update:
+            await application.process_update(update)
+            return "ok", 200
+        else:
+            logger.warning("Received invalid update")
+            return "Invalid update", 400
     except Exception as e:
         logger.error(f"Webhook error: {e}")
-    return "ok"
+        return "Error", 500
 
-@flask_app.get("/")
+@flask_app.route("/")
 def index():
-    return "Alfred Food Bot running!"
+    return "Alfred Food Bot running!", 200
 
 # --------------------------------------------------------------------
 # Main
 if __name__ == "__main__":
-    # Đặt webhook khi start
+    if not TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN is not set")
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set")
+    
     if WEBHOOK_URL:
         async def set_webhook():
-            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook/{TOKEN}")
+            try:
+                await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+                logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+            except Exception as e:
+                logger.error(f"Failed to set webhook: {e}")
         asyncio.get_event_loop().run_until_complete(set_webhook())
-
+    
     flask_app.run(host="0.0.0.0", port=PORT)
