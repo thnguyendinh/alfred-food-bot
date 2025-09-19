@@ -332,7 +332,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    application = ApplicationBuilder().token(TOKEN).http_version="1.1").build()
+    application = ApplicationBuilder().token(TOKEN).http_version("1.1").build()
     logger.info("Application built successfully")
 except Exception as e:
     logger.error(f"Failed to build application: {e}")
@@ -389,7 +389,7 @@ if __name__ == "__main__":
     
     if not WEBHOOK_URL:
         logger.error("WEBHOOK_URL is not set")
-        raise ValueError("WEBHOOK_URL is not set")
+        raise ValueValueError("WEBHOOK_URL is not set")
     
     async def set_webhook():
         try:
