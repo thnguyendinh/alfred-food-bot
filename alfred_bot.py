@@ -152,6 +152,7 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {
             'update_id': random.randint(1, 1000),
             'message': {
+                'message_id': random.randint(1, 1000),
                 'text': '/fake',
                 'chat': {'id': user_id, 'type': 'private'},
                 'date': int(time.time())
@@ -205,6 +206,7 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {
             'update_id': random.randint(1, 1000),
             'message': {
+                'message_id': random.randint(1, 1000),
                 'text': '/fake',
                 'chat': {'id': user_id, 'type': 'private'},
                 'date': int(time.time())
@@ -245,6 +247,7 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
         {
             'update_id': random.randint(1, 1000),
             'message': {
+                'message_id': random.randint(1, 1000),
                 'text': '/fake',
                 'chat': {'id': user_id, 'type': 'private'},
                 'date': int(time.time())
@@ -263,6 +266,7 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {
             'update_id': random.randint(1, 1000),
             'message': {
+                'message_id': random.randint(1, 1000),
                 'text': '/fake',
                 'chat': {'id': user_id, 'type': 'private'},
                 'date': int(time.time())
@@ -291,6 +295,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {
             'update_id': random.randint(1, 1000),
             'message': {
+                'message_id': random.randint(1, 1000),
                 'text': '/fake',
                 'chat': {'id': user_id, 'type': 'private'},
                 'date': int(time.time())
@@ -323,6 +328,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {
             'update_id': random.randint(1, 1000),
             'message': {
+                'message_id': random.randint(1, 1000),
                 'text': '/fake',
                 'chat': {'id': user_id, 'type': 'private'},
                 'date': int(time.time())
@@ -371,6 +377,7 @@ def webhook():
                 {
                     'update_id': random.randint(1, 1000),
                     'message': {
+                        'message_id': random.randint(1, 1000),
                         'text': '/fake',
                         'chat': {'id': update.effective_user.id, 'type': 'private'},
                         'date': int(time.time())
