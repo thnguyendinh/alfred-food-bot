@@ -1,4 +1,4 @@
 python-telegram-bot==20.7
-Flask==2.3.3
-requests==2.31.0
-pg8000==1.30.4  # Pure Python PostgreSQL driver
+flask==2.3.3
+gunicorn==22.0.0
+pg8000==1.31.2
