@@ -20,6 +20,20 @@ RENDER = os.getenv("RENDER", False)
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Kiểm tra và import database driver
+USE_POSTGRES = False
+if DATABASE_URL and "postgres" in DATABASE_URL:
+    try:
+        import pg8000.native
+        USE_POSTGRES = True
+    except ImportError:
+        USE_POSTGRES = False
+        logging.warning("pg8000 not available, falling back to SQLite")
+
+# Fallback to SQLite
+if not USE_POSTGRES:
+    import sqlite3
+
 # Khởi tạo Flask app nếu dùng webhook
 if RENDER and WEBHOOK_URL:
     app = Flask(__name__)
@@ -36,7 +50,6 @@ SELECTING_ACTION, CHOOSING_TYPE, PROVIDING_LOCATION, GETTING_HISTORY = range(4)
 
 # ===== CƠ SỞ DỮ LIỆU MÓN ĂN =====
 VIETNAMESE_FOODS = {
-    
     # ===== Miền Bắc =====
     "phở": {
         "type": "nước", "category": "phở",
@@ -129,7 +142,7 @@ VIETNAMESE_FOODS = {
     "hủ tiếu": {
         "type": "nước", "category": "hủ tiếu",
         "ingredients": ["hủ tiếu", "thịt", "tôm", "trứng cút"],
-        "recipe": "Nấu nước hầm xương, chan lên hủ tiếu.",
+        "recipe": "Nấu nước hầm xương, chan lên h�ủ tiếu.",
         "popular_regions": ["Sài Gòn", "Miền Tây"],
         "holidays": ["Bữa sáng"]
     },
@@ -190,6 +203,7 @@ VIETNAMESE_FOODS = {
         "holidays": ["Tết Hàn Thực", "Ngày thường"]
     }
 }
+
 REGIONAL_FOODS = {
     # ===== Bắc Bộ =====
     "Hà Nội": ["phở", "bún chả", "bún đậu mắm tôm", "bánh cuốn", "cháo lòng"],
@@ -234,109 +248,194 @@ REGIONAL_FOODS = {
     "Vũng Tàu": ["bánh khọt Vũng Tàu", "hải sản Vũng Tàu"]
 }
 
-
 # ===== LỚP DATABASE =====
-class PostgreSQLDatabase:
+class Database:
     def __init__(self):
         self.conn = None
         self.connect()
         self.create_tables()
     
     def connect(self):
-        """Kết nối đến PostgreSQL database"""
+        """Kết nối đến database"""
         try:
-            # Parse connection string
-            import urllib.parse
-            url = urllib.parse.urlparse(DATABASE_URL)
-            
-            self.conn = pg8000.native.Connection(
-                user=url.username,
-                password=url.password,
-                host=url.hostname,
-                port=url.port,
-                database=url.path[1:]  # Bỏ dấu / ở đầu
-            )
-            logger.info("Kết nối PostgreSQL thành công với pg8000")
+            if USE_POSTGRES and DATABASE_URL:
+                # Parse connection string cho PostgreSQL
+                url = urllib.parse.urlparse(DATABASE_URL)
+                self.conn = pg8000.native.Connection(
+                    user=url.username,
+                    password=url.password,
+                    host=url.hostname,
+                    port=url.port,
+                    database=url.path[1:]  # Bỏ dấu / ở đầu
+                )
+                logger.info("Kết nối PostgreSQL thành công với pg8000")
+            else:
+                # Fallback to SQLite
+                db_path = '/tmp/alfred.db' if RENDER else 'alfred.db'
+                self.conn = sqlite3.connect(db_path, check_same_thread=False)
+                logger.info("Kết nối SQLite thành công")
         except Exception as e:
-            logger.error(f"Lỗi kết nối PostgreSQL: {e}")
+            logger.error(f"Lỗi kết nối database: {e}")
+            # Tạo SQLite connection như fallback
+            try:
+                db_path = '/tmp/alfred.db' if RENDER else 'alfred.db'
+                self.conn = sqlite3.connect(db_path, check_same_thread=False)
+                logger.info("Fallback SQLite connection thành công")
+            except Exception as e2:
+                logger.error(f"Lỗi fallback SQLite: {e2}")
     
     def create_tables(self):
         """Tạo bảng nếu chưa tồn tại"""
+        if self.conn is None:
+            logger.error("Không thể tạo bảng: connection is None")
+            return
+            
         try:
-            self.conn.run("""
-                CREATE TABLE IF NOT EXISTS user_histories (
-                    id SERIAL PRIMARY KEY,
-                    user_id BIGINT NOT NULL,
-                    food TEXT NOT NULL,
-                    meal_type TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            self.conn.run("""
-                CREATE TABLE IF NOT EXISTS user_preferences (
-                    user_id BIGINT PRIMARY KEY,
-                    preferences JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            self.conn.run("CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)")
-            logger.info("Tạo bảng PostgreSQL thành công")
+            if USE_POSTGRES:
+                # Tạo bảng cho PostgreSQL
+                self.conn.run("""
+                    CREATE TABLE IF NOT EXISTS user_histories (
+                        id SERIAL PRIMARY KEY,
+                        user_id BIGINT NOT NULL,
+                        food TEXT NOT NULL,
+                        meal_type TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                self.conn.run("""
+                    CREATE TABLE IF NOT EXISTS user_preferences (
+                        user_id BIGINT PRIMARY KEY,
+                        preferences JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                self.conn.run("CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)")
+            else:
+                # Tạo bảng cho SQLite
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS user_histories (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        food TEXT NOT NULL,
+                        meal_type TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS user_preferences (
+                        user_id INTEGER PRIMARY KEY,
+                        preferences TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)')
+                self.conn.commit()
+                
+            logger.info("Tạo bảng thành công")
         except Exception as e:
             logger.error(f"Lỗi tạo bảng: {e}")
-    
+
     def get_user_history(self, user_id: int) -> List[Dict]:
+        if self.conn is None:
+            return []
+            
         try:
-            result = self.conn.run(
-                "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10",
-                user_id
-            )
-            return [{"food": row[0], "type": row[1], "date": row[2].isoformat()} for row in result]
+            if USE_POSTGRES:
+                result = self.conn.run(
+                    "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10",
+                    user_id
+                )
+                return [{"food": row[0], "type": row[1], "date": row[2].isoformat()} for row in result]
+            else:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
+                    (user_id,)
+                )
+                rows = cursor.fetchall()
+                return [{"food": row[0], "type": row[1], "date": row[2]} for row in rows]
         except Exception as e:
             logger.error(f"Lỗi get_user_history: {e}")
             return []
-    
+
     def add_to_history(self, user_id: int, food: str, meal_type: str = None):
+        if self.conn is None:
+            return
+            
         try:
-            self.conn.run(
-                "INSERT INTO user_histories (user_id, food, meal_type) VALUES ($1, $2, $3)",
-                user_id, food, meal_type
-            )
+            if USE_POSTGRES:
+                self.conn.run(
+                    "INSERT INTO user_histories (user_id, food, meal_type) VALUES ($1, $2, $3)",
+                    user_id, food, meal_type
+                )
+            else:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "INSERT INTO user_histories (user_id, food, meal_type) VALUES (?, ?, ?)",
+                    (user_id, food, meal_type)
+                )
+                self.conn.commit()
         except Exception as e:
             logger.error(f"Lỗi add_to_history: {e}")
-    
+
     def get_user_preferences(self, user_id: int) -> Dict:
+        if self.conn is None:
+            return {}
+            
         try:
-            result = self.conn.run(
-                "SELECT preferences FROM user_preferences WHERE user_id = $1",
-                user_id
-            )
-            if result and result[0]:
-                return json.loads(result[0][0])
+            if USE_POSTGRES:
+                result = self.conn.run(
+                    "SELECT preferences FROM user_preferences WHERE user_id = $1",
+                    user_id
+                )
+                if result and result[0]:
+                    return json.loads(result[0][0])
+            else:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "SELECT preferences FROM user_preferences WHERE user_id = ?",
+                    (user_id,)
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    return json.loads(row[0])
             return {}
         except Exception as e:
             logger.error(f"Lỗi get_user_preferences: {e}")
             return {}
-    
+
     def save_user_preferences(self, user_id: int, preferences: Dict):
+        if self.conn is None:
+            return
+            
         try:
             preferences_json = json.dumps(preferences)
-            self.conn.run(
-                """INSERT INTO user_preferences (user_id, preferences) 
-                   VALUES ($1, $2)
-                   ON CONFLICT (user_id) 
-                   DO UPDATE SET preferences = $2, updated_at = CURRENT_TIMESTAMP""",
-                user_id, preferences_json
-            )
+            if USE_POSTGRES:
+                self.conn.run(
+                    """INSERT INTO user_preferences (user_id, preferences) 
+                       VALUES ($1, $2)
+                       ON CONFLICT (user_id) 
+                       DO UPDATE SET preferences = $2, updated_at = CURRENT_TIMESTAMP""",
+                    user_id, preferences_json
+                )
+            else:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    """INSERT OR REPLACE INTO user_preferences (user_id, preferences, updated_at) 
+                       VALUES (?, ?, CURRENT_TIMESTAMP)""",
+                    (user_id, preferences_json)
+                )
+                self.conn.commit()
         except Exception as e:
             logger.error(f"Lỗi save_user_preferences: {e}")
 
 # ===== LỚP FOOD ASSISTANT =====
 class FoodAssistant:
     def __init__(self):
-        self.db = PostgreSQLDatabase()
+        self.db = Database()
         
     def get_user_history(self, user_id: int) -> List[Dict]:
         return self.db.get_user_history(user_id)
@@ -522,6 +621,7 @@ def main() -> None:
         logger.error("TELEGRAM_BOT_TOKEN không được thiết lập!")
         return
     
+    # Tạo application với các tham số đúng
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -550,14 +650,19 @@ def main() -> None:
         def index():
             return 'Alfred Food Bot is running!'
         
+        # Sửa lỗi run_webhook
         application.run_webhook(
             listen="0.0.0.0",
             port=int(os.environ.get("PORT", 5000)),
-            url_path=TELEGRAM_BOT_TOKEN,
-            webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}"
+            webhook_url=WEBHOOK_URL,
+            secret_token='WEBHOOK_SECRET'  # Thêm secret token
         )
     else:
-        application.run_polling()
+        # Sửa lỗi polling
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
         print("Bot đang chạy...")
 
 if __name__ == "__main__":
