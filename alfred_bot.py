@@ -1,4 +1,4 @@
-
+```python
 import os
 import logging
 import random
@@ -116,202 +116,34 @@ db = Database()
 
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"Received /start from user {update.effective_user.id}")
-    await update.message.reply_text(
-        "Xin chào! Mình là Alfred Food Bot.\n"
-        "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
-        "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
-        "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
-        "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
-        "- Gửi tên món: Tra thông tin chi tiết."
-    )
+    user_id = str(update.effective_user.id)
+    logger.info(f"Received /start from user {user_id}")
+    try:
+        await update.message.reply_text(
+            "Xin chào! Mình là Alfred Food Bot.\n"
+            "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
+            "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
+            "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
+            "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
+            "- Gửi tên món: Tra thông tin chi tiết."
+        )
+        logger.info(f"Sent /start response to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send /start response to user {user_id}: {e}")
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /suggest from user {user_id}")
-    eaten = db.get_eaten(user_id)
-    options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
-    if not options:
-        options = list(VIETNAMESE_FOODS.keys())
-    choice = random.choice(options)
-    db.add_eaten(user_id, choice)
-    food_info = VIETNAMESE_FOODS[choice]
-    response = (
-        f"Hôm nay bạn thử món: *{choice}*\n"
-        f"- Loại: {food_info['type']}\n"
-        f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
-        f"- Cách làm: {food_info['recipe']}\n"
-        f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
-        f"- Dịp: {', '.join(food_info['holidays'])}\n"
-        f"- Calo ước tính: {food_info['calories']}"
-    )
-    await update.message.reply_text(response, parse_mode="Markdown")
-    # Lệnh giả
-    await asyncio.sleep(0.1)
-    fake_update = Update.de_json(
-        {
-            'update_id': random.randint(1, 1000),
-            'message': {
-                'message_id': random.randint(1, 1000),
-                'text': '/fake',
-                'chat': {'id': user_id, 'type': 'private'},
-                'date': int(time.time())
-            }
-        }, application.bot
-    )
-    await application.process_update(fake_update)
-
-async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    logger.info(f"Received /region from user {user_id} with args: {context.args}")
-    if context.args:
-        user_input = ' '.join(context.args)
-        def normalize_string(s):
-            import unicodedata
-            return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
-
-        normalized_input = normalize_string(user_input)
-        normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
-
-        def levenshtein_distance(s1, s2):
-            if len(s1) < len(s2):
-                return levenshtein_distance(s2, s1)
-            if len(s2) == 0:
-                return len(s1)
-            previous_row = range(len(s2) + 1)
-            for i, c1 in enumerate(s1):
-                current_row = [i + 1]
-                for j, c2 in enumerate(s2):
-                    insertions = previous_row[j + 1] + 1
-                    deletions = current_row[j] + 1
-                    substitutions = previous_row[j] + (c1 != c2)
-                    current_row.append(min(insertions, deletions, substitutions))
-                previous_row = current_row
-            return previous_row[-1]
-
-        best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
-        distance = levenshtein_distance(normalized_input, best_match)
-        if distance <= 3:
-            region = normalized_regions[best_match]
-            foods = REGIONAL_FOODS[region]
-            response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
-            await update.message.reply_text(response, parse_mode="Markdown")
-        else:
-            await update.message.reply_text(f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
-    else:
-        await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
-    # Lệnh giả
-    await asyncio.sleep(0.1)
-    fake_update = Update.de_json(
-        {
-            'update_id': random.randint(1, 1000),
-            'message': {
-                'message_id': random.randint(1, 1000),
-                'text': '/fake',
-                'chat': {'id': user_id, 'type': 'private'},
-                'date': int(time.time())
-            }
-        }, application.bot
-    )
-    await application.process_update(fake_update)
-
-async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    logger.info(f"Received /ingredient from user {user_id} with args: {context.args}")
-    if context.args:
-        user_ingredients = [ing.lower() for ing in ' '.join(context.args).split(',')]
-        matching_foods = []
-        for food, info in VIETNAMESE_FOODS.items():
-            if any(ing in [i.lower() for i in info['ingredients']] for ing in user_ingredients):
-                matching_foods.append(food)
-        if matching_foods:
-            choice = random.choice(matching_foods)
-            food_info = VIETNAMESE_FOODS[choice]
-            response = (
-                f"Món gợi ý từ nguyên liệu: *{choice}*\n"
-                f"- Loại: {food_info['type']}\n"
-                f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
-                f"- Cách làm: {food_info['recipe']}\n"
-                f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
-                f"- Dịp: {', '.join(food_info['holidays'])}\n"
-                f"- Calo ước tính: {food_info['calories']}"
-            )
-            await update.message.reply_text(response, parse_mode="Markdown")
-        else:
-            await update.message.reply_text("Không tìm thấy món phù hợp với nguyên liệu. Thử lại!")
-    else:
-        await update.message.reply_text("Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm")
-    # Lệnh giả
-    await asyncio.sleep(0.1)
-    fake_update = Update.de_json(
-        {
-            'update_id': random.randint(1, 1000),
-            'message': {
-                'message_id': random.randint(1, 1000),
-                'text': '/fake',
-                'chat': {'id': user_id, 'type': 'private'},
-                'date': int(time.time())
-            }
-        }, application.bot
-    )
-    await application.process_update(fake_update)
-
-async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    logger.info(f"Received /location from user {user_id}")
-    await update.message.reply_text("Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu).")
-    # Lệnh giả
-    await asyncio.sleep(0.1)
-    fake_update = Update.de_json(
-        {
-            'update_id': random.randint(1, 1000),
-            'message': {
-                'message_id': random.randint(1, 1000),
-                'text': '/fake',
-                'chat': {'id': user_id, 'type': 'private'},
-                'date': int(time.time())
-            }
-        }, application.bot
-    )
-    await application.process_update(fake_update)
-
-async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    location = update.message.location
-    if location:
-        logger.info(f"Received location from user {user_id}: {location.latitude}, {location.longitude}")
-        region = "Sài Gòn"  # Giả lập, cần API geocode để thực tế
-        foods = REGIONAL_FOODS.get(region, [])
-        if foods:
-            response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
-            await update.message.reply_text(response, parse_mode="Markdown")
-        else:
-            await update.message.reply_text("Không tìm thấy vùng gần vị trí của bạn.")
-    else:
-        await update.message.reply_text("Vui lòng chia sẻ position.")
-    # Lệnh giả
-    await asyncio.sleep(0.1)
-    fake_update = Update.de_json(
-        {
-            'update_id': random.randint(1, 1000),
-            'message': {
-                'message_id': random.randint(1, 1000),
-                'text': '/fake',
-                'chat': {'id': user_id, 'type': 'private'},
-                'date': int(time.time())
-            }
-        }, application.bot
-    )
-    await application.process_update(fake_update)
-
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    text = update.message.text.lower()
-    logger.info(f"Received text '{text}' from user {user_id}")
-    if text in VIETNAMESE_FOODS:
-        food_info = VIETNAMESE_FOODS[text]
+    try:
+        eaten = db.get_eaten(user_id)
+        options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
+        if not options:
+            options = list(VIETNAMESE_FOODS.keys())
+        choice = random.choice(options)
+        db.add_eaten(user_id, choice)
+        food_info = VIETNAMESE_FOODS[choice]
         response = (
-            f"{text} là món ăn nổi tiếng!\n"
+            f"Hôm nay bạn thử món: *{choice}*\n"
             f"- Loại: {food_info['type']}\n"
             f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
             f"- Cách làm: {food_info['recipe']}\n"
@@ -319,23 +151,143 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- Dịp: {', '.join(food_info['holidays'])}\n"
             f"- Calo ước tính: {food_info['calories']}"
         )
-        await update.message.reply_text(response)
-    else:
-        await update.message.reply_text("Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!")
-    # Lệnh giả
-    await asyncio.sleep(0.1)
-    fake_update = Update.de_json(
-        {
-            'update_id': random.randint(1, 1000),
-            'message': {
-                'message_id': random.randint(1, 1000),
-                'text': '/fake',
-                'chat': {'id': user_id, 'type': 'private'},
-                'date': int(time.time())
-            }
-        }, application.bot
-    )
-    await application.process_update(fake_update)
+        await update.message.reply_text(response, parse_mode="Markdown")
+        logger.info(f"Sent /suggest response to user {user_id}: {choice}")
+    except Exception as e:
+        logger.error(f"Failed to send /suggest response to user {user_id}: {e}")
+
+async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    logger.info(f"Received /region from user {user_id} with args: {context.args}")
+    try:
+        if context.args:
+            user_input = ' '.join(context.args)
+            def normalize_string(s):
+                import unicodedata
+                return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
+
+            normalized_input = normalize_string(user_input)
+            normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
+
+            def levenshtein_distance(s1, s2):
+                if len(s1) < len(s2):
+                    return levenshtein_distance(s2, s1)
+                if len(s2) == 0:
+                    return len(s1)
+                previous_row = range(len(s2) + 1)
+                for i, c1 in enumerate(s1):
+                    current_row = [i + 1]
+                    for j, c2 in enumerate(s2):
+                        insertions = previous_row[j + 1] + 1
+                        deletions = current_row[j] + 1
+                        substitutions = previous_row[j] + (c1 != c2)
+                        current_row.append(min(insertions, deletions, substitutions))
+                    previous_row = current_row
+                return previous_row[-1]
+
+            best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
+            distance = levenshtein_distance(normalized_input, best_match)
+            if distance <= 3:
+                region = normalized_regions[best_match]
+                foods = REGIONAL_FOODS[region]
+                response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
+                await update.message.reply_text(response, parse_mode="Markdown")
+                logger.info(f"Sent /region response to user {user_id}: {region}")
+            else:
+                await update.message.reply_text(f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
+                logger.info(f"Sent /region not found response to user {user_id}")
+        else:
+            await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
+            logger.info(f"Sent /region usage response to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send /region response to user {user_id}: {e}")
+
+async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    logger.info(f"Received /ingredient from user {user_id} with args: {context.args}")
+    try:
+        if context.args:
+            user_ingredients = [ing.lower() for ing in ' '.join(context.args).split(',')]
+            matching_foods = []
+            for food, info in VIETNAMESE_FOODS.items():
+                if any(ing in [i.lower() for i in info['ingredients']] for ing in user_ingredients):
+                    matching_foods.append(food)
+            if matching_foods:
+                choice = random.choice(matching_foods)
+                food_info = VIETNAMESE_FOODS[choice]
+                response = (
+                    f"Món gợi ý từ nguyên liệu: *{choice}*\n"
+                    f"- Loại: {food_info['type']}\n"
+                    f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
+                    f"- Cách làm: {food_info['recipe']}\n"
+                    f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
+                    f"- Dịp: {', '.join(food_info['holidays'])}\n"
+                    f"- Calo ước tính: {food_info['calories']}"
+                )
+                await update.message.reply_text(response, parse_mode="Markdown")
+                logger.info(f"Sent /ingredient response to user {user_id}: {choice}")
+            else:
+                await update.message.reply_text("Không tìm thấy món phù hợp với nguyên liệu. Thử lại!")
+                logger.info(f"Sent /ingredient not found response to user {user_id}")
+        else:
+            await update.message.reply_text("Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm")
+            logger.info(f"Sent /ingredient usage response to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send /ingredient response to user {user_id}: {e}")
+
+async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    logger.info(f"Received /location from user {user_id}")
+    try:
+        await update.message.reply_text("Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu).")
+        logger.info(f"Sent /location response to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send /location response to user {user_id}: {e}")
+
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    location = update.message.location
+    logger.info(f"Received location from user {user_id}: {location.latitude if location else None}, {location.longitude if location else None}")
+    try:
+        if location:
+            region = "Sài Gòn"  # Giả lập, cần API geocode để thực tế
+            foods = REGIONAL_FOODS.get(region, [])
+            if foods:
+                response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
+                await update.message.reply_text(response, parse_mode="Markdown")
+                logger.info(f"Sent location-based response to user {user_id}: {region}")
+            else:
+                await update.message.reply_text("Không tìm thấy vùng gần vị trí của bạn.")
+                logger.info(f"Sent location not found response to user {user_id}")
+        else:
+            await update.message.reply_text("Vui lòng chia sẻ position.")
+            logger.info(f"Sent location request response to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send location response to user {user_id}: {e}")
+
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    text = update.message.text.lower()
+    logger.info(f"Received text '{text}' from user {user_id}")
+    try:
+        if text in VIETNAMESE_FOODS:
+            food_info = VIETNAMESE_FOODS[text]
+            response = (
+                f"{text} là món ăn nổi tiếng!\n"
+                f"- Loại: {food_info['type']}\n"
+                f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
+                f"- Cách làm: {food_info['recipe']}\n"
+                f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
+                f"- Dịp: {', '.join(food_info['holidays'])}\n"
+                f"- Calo ước tính: {food_info['calories']}"
+            )
+            await update.message.reply_text(response)
+            logger.info(f"Sent echo response to user {user_id}: {text}")
+        else:
+            await update.message.reply_text("Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!")
+            logger.info(f"Sent echo not found response to user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to send echo response to user {user_id}: {e}")
 
 # Build Application
 try:
@@ -372,19 +324,6 @@ def webhook():
             logger.info(f"Processing update: {update.update_id}")
             asyncio.run_coroutine_threadsafe(application.process_update(update), asyncio.get_event_loop())
             logger.info(f"Processed update: {update.update_id}")
-            # Lệnh giả trong webhook
-            fake_update = Update.de_json(
-                {
-                    'update_id': random.randint(1, 1000),
-                    'message': {
-                        'message_id': random.randint(1, 1000),
-                        'text': '/fake',
-                        'chat': {'id': update.effective_user.id, 'type': 'private'},
-                        'date': int(time.time())
-                    }
-                }, application.bot
-            )
-            asyncio.run_coroutine_threadsafe(application.process_update(fake_update), asyncio.get_event_loop())
             return "ok", 200
         else:
             logger.warning("Received invalid update")
@@ -429,3 +368,4 @@ if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(set_webhook())
     logger.info("Starting Flask server...")
     flask_app.run(host="0.0.0.0", port=PORT)
+```
