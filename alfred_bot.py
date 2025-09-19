@@ -359,13 +359,41 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     logger.info(f"Received /region from user {user_id} with args: {context.args}")
     if context.args:
-        region = ' '.join(context.args).title()
-        if region in REGIONAL_FOODS:
+        user_input = ' '.join(context.args)
+        # Normalize function to remove accents and lower case
+        def normalize_string(s):
+            import unicodedata
+            return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
+
+        normalized_input = normalize_string(user_input)
+        normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
+
+        # Simple fuzzy match using Levenshtein distance (implement thủ công vì không có fuzzywuzzy)
+        def levenshtein_distance(s1, s2):
+            if len(s1) < len(s2):
+                return levenshtein_distance(s2, s1)
+            if len(s2) == 0:
+                return len(s1)
+            previous_row = range(len(s2) + 1)
+            for i, c1 in enumerate(s1):
+                current_row = [i + 1]
+                for j, c2 in enumerate(s2):
+                    insertions = previous_row[j + 1] + 1
+                    deletions = current_row[j] + 1
+                    substitutions = previous_row[j] + (c1 != c2)
+                    current_row.append(min(insertions, deletions, substitutions))
+                previous_row = current_row
+            return previous_row[-1]
+
+        best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
+        distance = levenshtein_distance(normalized_input, best_match)
+        if distance <= 2:  # Threshold cho match gần (tùy chỉnh)
+            region = normalized_regions[best_match]
             foods = REGIONAL_FOODS[region]
             response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
             await update.message.reply_text(response, parse_mode="Markdown")
         else:
-            await update.message.reply_text(f"Không tìm thấy vùng '{region}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
+            await update.message.reply_text(f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v.")
     else:
         await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
 
