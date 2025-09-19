@@ -246,16 +246,25 @@ class PostgreSQLDatabase:
     def connect(self):
         """Kết nối đến PostgreSQL database"""
         try:
-            self.conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-            logger.info("Kết nối PostgreSQL thành công")
+            # Parse connection string
+            import urllib.parse
+            url = urllib.parse.urlparse(DATABASE_URL)
+            
+            self.conn = pg8000.native.Connection(
+                user=url.username,
+                password=url.password,
+                host=url.hostname,
+                port=url.port,
+                database=url.path[1:]  # Bỏ dấu / ở đầu
+            )
+            logger.info("Kết nối PostgreSQL thành công với pg8000")
         except Exception as e:
             logger.error(f"Lỗi kết nối PostgreSQL: {e}")
     
     def create_tables(self):
         """Tạo bảng nếu chưa tồn tại"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
+            self.conn.run("""
                 CREATE TABLE IF NOT EXISTS user_histories (
                     id SERIAL PRIMARY KEY,
                     user_id BIGINT NOT NULL,
@@ -263,68 +272,65 @@ class PostgreSQLDatabase:
                     meal_type TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
-            cursor.execute('''
+            """)
+            
+            self.conn.run("""
                 CREATE TABLE IF NOT EXISTS user_preferences (
                     user_id BIGINT PRIMARY KEY,
                     preferences JSONB,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)')
-            self.conn.commit()
+            """)
+            
+            self.conn.run("CREATE INDEX IF NOT EXISTS idx_user_id ON user_histories(user_id)")
+            logger.info("Tạo bảng PostgreSQL thành công")
         except Exception as e:
             logger.error(f"Lỗi tạo bảng: {e}")
-
+    
     def get_user_history(self, user_id: int) -> List[Dict]:
         try:
-            cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            cursor.execute(
-                "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = %s ORDER BY created_at DESC LIMIT 10",
-                (user_id,)
+            result = self.conn.run(
+                "SELECT food, meal_type, created_at FROM user_histories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10",
+                user_id
             )
-            return [{"food": row[0], "type": row[1], "date": row[2].isoformat()} for row in cursor.fetchall()]
+            return [{"food": row[0], "type": row[1], "date": row[2].isoformat()} for row in result]
         except Exception as e:
             logger.error(f"Lỗi get_user_history: {e}")
             return []
-
+    
     def add_to_history(self, user_id: int, food: str, meal_type: str = None):
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                "INSERT INTO user_histories (user_id, food, meal_type) VALUES (%s, %s, %s)",
-                (user_id, food, meal_type)
+            self.conn.run(
+                "INSERT INTO user_histories (user_id, food, meal_type) VALUES ($1, $2, $3)",
+                user_id, food, meal_type
             )
-            self.conn.commit()
         except Exception as e:
             logger.error(f"Lỗi add_to_history: {e}")
-
+    
     def get_user_preferences(self, user_id: int) -> Dict:
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(
-                "SELECT preferences FROM user_preferences WHERE user_id = %s",
-                (user_id,)
+            result = self.conn.run(
+                "SELECT preferences FROM user_preferences WHERE user_id = $1",
+                user_id
             )
-            row = cursor.fetchone()
-            return json.loads(row[0]) if row and row[0] else {}
+            if result and result[0]:
+                return json.loads(result[0][0])
+            return {}
         except Exception as e:
             logger.error(f"Lỗi get_user_preferences: {e}")
             return {}
-
+    
     def save_user_preferences(self, user_id: int, preferences: Dict):
         try:
-            cursor = self.conn.cursor()
             preferences_json = json.dumps(preferences)
-            cursor.execute(
+            self.conn.run(
                 """INSERT INTO user_preferences (user_id, preferences) 
-                   VALUES (%s, %s)
+                   VALUES ($1, $2)
                    ON CONFLICT (user_id) 
-                   DO UPDATE SET preferences = %s, updated_at = CURRENT_TIMESTAMP""",
-                (user_id, preferences_json, preferences_json)
+                   DO UPDATE SET preferences = $2, updated_at = CURRENT_TIMESTAMP""",
+                user_id, preferences_json
             )
-            self.conn.commit()
         except Exception as e:
             logger.error(f"Lỗi save_user_preferences: {e}")
 
