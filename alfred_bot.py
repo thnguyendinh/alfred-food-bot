@@ -479,31 +479,29 @@ asyncio.get_event_loop().run_until_complete(application.initialize())
 logger.info("Application initialized successfully")
 
 # Flask app for Render webhook
+# Thay thế phần Flask app với cấu hình đúng cho Render
 flask_app = Flask(__name__)
 
 @flask_app.post("/webhook")
 def webhook():
     try:
-        json_data = request.get_json(force=True)
-        logger.info(f"Received webhook data: {json_data}")
-        update = Update.de_json(json_data, application.bot)
-        if update:
-            logger.info(f"Processing update: {update.update_id}")
-            asyncio.run_coroutine_threadsafe(application.process_update(update), asyncio.get_event_loop())
-            logger.info(f"Processed update: {update.update_id}")
-            return "ok", 200
-        else:
-            logger.warning("Received invalid update")
-            return "Invalid update", 400
+        # Nhận update từ Telegram
+        update = Update.de_json(request.get_json(), application.bot)
+        
+        # Xử lý update bất đồng bộ
+        asyncio.run_coroutine_threadsafe(
+            application.process_update(update), 
+            asyncio.get_event_loop()
+        )
+        return "ok", 200
     except Exception as e:
-        logger.error(f"Webhook error: {str(e)}", exc_info=True)
+        logger.error(f"Webhook error: {e}")
         return "Error", 500
 
-@flask_app.get("/webhook")
-def webhook_get():
-    logger.warning("Webhook endpoint only accepts POST requests")
-    return "Method Not Allowed: Use POST for webhook", 405
-
+@flask_app.get("/")
+def index():
+    return "Alfred Food Bot is running!", 200
+    
 @flask_app.route("/")
 def index():
     return "Alfred Food Bot running!", 200
@@ -518,21 +516,21 @@ if __name__ == "__main__":
         logger.error("WEBHOOK_URL is not set")
         raise ValueError("WEBHOOK_URL is not set")
     
-    async def set_webhook():
-        try:
-            webhook_info = await application.bot.get_webhook_info()
-            logger.info(f"Current webhook info: {webhook_info}")
-            if webhook_info.url != f"{WEBHOOK_URL}/webhook":
-                await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-                logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-            else:
-                logger.info("Webhook already set correctly")
-        except TelegramError as te:
-            logger.error(f"Failed to set webhook: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to set webhook: {e}")
-            raise
+    # Thay thế hàm set_webhook
+async def set_webhook():
+    try:
+        # Xóa webhook cũ trước
+        await application.bot.delete_webhook()
+        
+        # Đặt webhook mới
+        await application.bot.set_webhook(
+            url=f"{WEBHOOK_URL}/webhook",
+            allowed_updates=["message", "callback_query"]
+        )
+        logger.info(f"Webhook set to: {WEBHOOK_URL}/webhook")
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {e}")
+        raise
     
     logger.info("Starting bot and setting webhook...")
     asyncio.get_event_loop().run_until_complete(set_webhook())
