@@ -28,6 +28,12 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
 PORT = int(os.getenv("PORT", 10000))  # Render default port
 
+# Log environment variables (for debugging)
+logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
+logger.info(f"DATABASE_URL: {'Set' if DATABASE_URL else 'Not set'}")
+logger.info(f"PORT: {PORT}")
+logger.info(f"TOKEN: {'Set' if TOKEN else 'Not set'}")
+
 # --------------------------------------------------------------------
 # Database
 class Database:
@@ -37,7 +43,6 @@ class Database:
         self.sqlite_conn = None
         if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
             try:
-                # Parse DATABASE_URL
                 parsed = urllib.parse.urlparse(DATABASE_URL)
                 db_params = {
                     "user": parsed.username,
@@ -49,6 +54,7 @@ class Database:
                 self.pg_conn = pg8000.native.Connection(**db_params)
                 self.use_postgres = True
                 self.pg_conn.run("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT)")
+                logger.info("Connected to PostgreSQL")
             except Exception as e:
                 logger.error(f"Postgres init failed: {e}. Falling back to SQLite.")
                 self._init_sqlite()
@@ -60,6 +66,7 @@ class Database:
             self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
             self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT)")
             self.sqlite_conn.commit()
+            logger.info("Connected to SQLite")
         except Exception as e:
             logger.error(f"SQLite init failed: {e}")
 
@@ -74,6 +81,7 @@ class Database:
             else:
                 conn.execute("INSERT INTO eaten_foods (user_id, food) VALUES (?, ?)", (user_id, food))
                 conn.commit()
+            logger.info(f"Added food {food} for user {user_id}")
         except Exception as e:
             logger.error(f"DB add error: {e}")
 
@@ -271,7 +279,6 @@ VIETNAMESE_FOODS = {
 }
 
 REGIONAL_FOODS = {
-    # Bắc Bộ
     "Hà Nội": ["phở", "bún chả", "bún đậu mắm tôm", "bánh cuốn", "cháo lòng"],
     "Hải Phòng": ["bánh đa cua", "nem cua bể", "lẩu cua đồng"],
     "Quảng Ninh": ["cháo hà", "sá sùng nướng", "sam biển"],
@@ -279,12 +286,10 @@ REGIONAL_FOODS = {
     "Ninh Bình": ["cơm cháy Ninh Bình", "dê núi Ninh Bình"],
     "Thái Bình": ["bánh cáy", "canh cá rô đồng"],
     "Lạng Sơn": ["vịt quay Lạng Sơn", "khâu nhục"],
-    # Bắc Trung Bộ
     "Thanh Hóa": ["nem chua Thanh Hóa", "chè lam Phủ Quảng"],
     "Nghệ An": ["cháo lươn Nghệ An", "mực nhảy Cửa Lò"],
     "Hà Tĩnh": ["ram bánh mướt", "cháo canh Hà Tĩnh"],
     "Huế": ["bún bò Huế", "cơm hến", "bánh bèo", "bánh nậm", "bánh lọc"],
-    # Duyên hải Nam Trung Bộ
     "Đà Nẵng": ["mì quảng", "bánh xèo", "bún chả cá"],
     "Quảng Nam": ["cao lầu Hội An", "mì Quảng gà", "bánh bao bánh vạc"],
     "Quảng Ngãi": ["don Quảng Ngãi", "ram bắp"],
@@ -293,12 +298,10 @@ REGIONAL_FOODS = {
     "Khánh Hòa": ["nem nướng Nha Trang", "bún sứa", "yến sào"],
     "Ninh Thuận": ["nho Ninh Thuận", "thịt cừu nướng"],
     "Bình Thuận": ["bánh canh chả cá Phan Thiết", "dông nướng", "thanh long"],
-    # Tây Nguyên
     "Gia Lai": ["phở khô Gia Lai (phở hai tô)"],
     "Đắk Lắk": ["cà phê Buôn Ma Thuột", "bún đỏ"],
     "Kon Tum": ["gỏi lá Kon Tum"],
     "Lâm Đồng": ["lẩu gà lá é", "dâu tây Đà Lạt"],
-    # Nam Bộ
     "Sài Gòn": ["cơm tấm", "hủ tiếu", "bánh mì", "gỏi cuốn", "bánh khọt"],
     "Cần Thơ": ["lẩu mắm", "ốc nướng tiêu xanh", "bánh xèo miền Tây"],
     "An Giang": ["gỏi sầu đâu", "mắm Châu Đốc", "bò bảy món"],
@@ -313,6 +316,7 @@ REGIONAL_FOODS = {
 # --------------------------------------------------------------------
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Received /start from user {update.effective_user.id}")
     await update.message.reply_text(
         "Xin chào! Mình là Alfred Food Bot.\n"
         "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
@@ -322,6 +326,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    logger.info(f"Received /suggest from user {user_id}")
     eaten = db.get_eaten(user_id)
     options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
     if not options:
@@ -340,8 +345,10 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response, parse_mode="Markdown")
 
 async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    logger.info(f"Received /region from user {user_id} with args: {context.args}")
     if context.args:
-        region = ' '.join(context.args).title()  # Ví dụ: "Hà Nội"
+        region = ' '.join(context.args).title()
         if region in REGIONAL_FOODS:
             foods = REGIONAL_FOODS[region]
             response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
@@ -352,7 +359,9 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
     text = update.message.text.lower()
+    logger.info(f"Received text '{text}' from user {user_id}")
     if text in VIETNAMESE_FOODS:
         food_info = VIETNAMESE_FOODS[text]
         response = (
@@ -369,7 +378,14 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --------------------------------------------------------------------
 # Build Application
-application = ApplicationBuilder().token(TOKEN).build()
+try:
+    logger.info("Building Telegram application...")
+    application = ApplicationBuilder().token(TOKEN).build()
+    logger.info("Application built successfully")
+except Exception as e:
+    logger.error(f"Failed to build application: {e}")
+    raise
+
 application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("suggest", suggest))
 application.add_handler(CommandHandler("region", region_suggest))
@@ -382,16 +398,25 @@ flask_app = Flask(__name__)
 @flask_app.route("/webhook", methods=["POST"])
 async def webhook():
     try:
-        update = Update.de_json(request.get_json(force=True), application.bot)
+        json_data = request.get_json(force=True)
+        logger.info(f"Received webhook data: {json_data}")
+        update = Update.de_json(json_data, application.bot)
         if update:
+            logger.info(f"Processing update: {update.update_id}")
             await application.process_update(update)
+            logger.info(f"Processed update: {update.update_id}")
             return "ok", 200
         else:
             logger.warning("Received invalid update")
             return "Invalid update", 400
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.error(f"Webhook error: {str(e)}", exc_info=True)
         return "Error", 500
+
+@flask_app.route("/webhook", methods=["GET"])
+async def webhook_get():
+    logger.warning("Webhook endpoint only accepts POST requests")
+    return "Method Not Allowed: Use POST for webhook", 405
 
 @flask_app.route("/")
 def index():
@@ -410,11 +435,18 @@ if __name__ == "__main__":
     
     async def set_webhook():
         try:
-            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+            webhook_info = await application.bot.get_webhook_info()
+            logger.info(f"Current webhook info: {webhook_info}")
+            if webhook_info.url != f"{WEBHOOK_URL}/webhook":
+                await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+                logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+            else:
+                logger.info("Webhook already set correctly")
         except Exception as e:
             logger.error(f"Failed to set webhook: {e}")
             raise
     
+    logger.info("Starting bot and setting webhook...")
     asyncio.get_event_loop().run_until_complete(set_webhook())
+    logger.info("Starting Flask server...")
     flask_app.run(host="0.0.0.0", port=PORT)
