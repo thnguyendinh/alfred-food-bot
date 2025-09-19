@@ -1,4 +1,4 @@
-```python
+
 import os
 import logging
 import random
@@ -368,4 +368,4 @@ if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(set_webhook())
     logger.info("Starting Flask server...")
     flask_app.run(host="0.0.0.0", port=PORT)
-```
+
