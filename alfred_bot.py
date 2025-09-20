@@ -554,8 +554,8 @@ async def donate(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Nhấn nút dưới để donate qua PayPal hoặc Momo."
         )
         keyboard = [
-            [InlineKeyboardButton("Donate qua PayPal", url="https://paypal.me/alfredfoodbot")],
-            [InlineKeyboardButton("Donate qua Momo", url="https://momo.vn/alfredfoodbot")]
+            #[InlineKeyboardButton("Donate qua PayPal", url="https://paypal.me/alfredfoodbot")],
+            [InlineKeyboardButton("Donate qua Viettel money", url="https://viettelmoney.go.link/fuCfu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         sent_message = await asyncio.wait_for(
