@@ -140,15 +140,34 @@ class Database:
 
 db = Database()
 
+# HTTPX client with retries
+async def send_message_with_retry(chat_id, text, parse_mode=None, retries=3, timeout=30.0):
+    async with httpx.AsyncClient() as client:
+        for attempt in range(retries):
+            try:
+                payload = {"chat_id": chat_id, "text": text}
+                if parse_mode:
+                    payload["parse_mode"] = parse_mode
+                http_response = await client.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json=payload,
+                    timeout=timeout
+                )
+                logger.info(f"HTTP response: chat_id={chat_id}, attempt={attempt+1}, status={http_response.status_code}, body={http_response.text}")
+                http_response.raise_for_status()
+                return http_response
+            except (httpx.TimeoutException, httpx.RequestError) as e:
+                logger.warning(f"Attempt {attempt+1}/{retries} failed for chat_id={chat_id}: {e}")
+                if attempt + 1 == retries:
+                    raise
+                await asyncio.sleep(1)
+
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
     logger.info(f"🎯 START HANDLER for user {user_id} in chat {chat_id}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         response = (
             "Xin chào! Mình là Alfred Food Bot.\n"
             "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
@@ -157,18 +176,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
             "- Gửi tên món: Tra thông tin chi tiết."
         )
-        # Log HTTP request
-        async with httpx.AsyncClient() as client:
-            http_response = await client.post(
-                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": response},
-                timeout=30.0
-            )
-            logger.info(f"HTTP response for /start to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-            http_response.raise_for_status()
-        # Send message
+        # Send message with retry
+        await send_message_with_retry(chat_id, response)
+        # Send message via Bot
         sent_message = await asyncio.wait_for(
-            update.message.reply_text(response),
+            context.bot.send_message(chat_id=chat_id, text=response),
             timeout=30.0
         )
         logger.info(f"✅ Sent /start response to user {user_id}: message_id={sent_message.message_id}")
@@ -186,9 +198,6 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     logger.info(f"🎯 SUGGEST HANDLER for user {user_id} in chat {chat_id}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         eaten = db.get_eaten(user_id)
         options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
         if not options:
@@ -205,18 +214,11 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- Dịp: {', '.join(food_info['holidays'])}\n"
             f"- Calo ước tính: {food_info['calories']}"
         )
-        # Log HTTP request
-        async with httpx.AsyncClient() as client:
-            http_response = await client.post(
-                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
-                timeout=30.0
-            )
-            logger.info(f"HTTP response for /suggest to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-            http_response.raise_for_status()
-        # Send message
+        # Send message with retry
+        await send_message_with_retry(chat_id, response, parse_mode="Markdown")
+        # Send message via Bot
         sent_message = await asyncio.wait_for(
-            update.message.reply_text(response, parse_mode="Markdown"),
+            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
             timeout=30.0
         )
         logger.info(f"✅ Sent /suggest response to user {user_id}: {choice}, message_id={sent_message.message_id}")
@@ -234,9 +236,6 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     logger.info(f"🎯 REGION HANDLER for user {user_id} with args: {context.args}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if context.args:
             user_input = ' '.join(context.args)
             def normalize_string(s):
@@ -265,46 +264,25 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 region = normalized_regions[best_match]
                 foods = REGIONAL_FOODS[region]
                 response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
-                async with httpx.AsyncClient() as client:
-                    http_response = await client.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
-                        timeout=30.0
-                    )
-                    logger.info(f"HTTP response for /region to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                    http_response.raise_for_status()
+                await send_message_with_retry(chat_id, response, parse_mode="Markdown")
                 sent_message = await asyncio.wait_for(
-                    update.message.reply_text(response, parse_mode="Markdown"),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /region response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
                 response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v."
-                async with httpx.AsyncClient() as client:
-                    http_response = await client.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": response},
-                        timeout=30.0
-                    )
-                    logger.info(f"HTTP response for /region not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                    http_response.raise_for_status()
+                await send_message_with_retry(chat_id, response)
                 sent_message = await asyncio.wait_for(
-                    update.message.reply_text(response),
+                    context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /region not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội"
-            async with httpx.AsyncClient() as client:
-                http_response = await client.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                    json={"chat_id": chat_id, "text": response},
-                    timeout=30.0
-                )
-                logger.info(f"HTTP response for /region usage to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                http_response.raise_for_status()
+            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
-                update.message.reply_text(response),
+                context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
             )
             logger.info(f"✅ Sent /region usage response to user {user_id}: message_id={sent_message.message_id}")
@@ -322,9 +300,6 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = update.effective_chat.id
     logger.info(f"🎯 INGREDIENT HANDLER for user {user_id} with args: {context.args}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if context.args:
             user_ingredients = [ing.lower() for ing in ' '.join(context.args).split(',')]
             matching_foods = []
@@ -343,46 +318,25 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"- Dịp: {', '.join(food_info['holidays'])}\n"
                     f"- Calo ước tính: {food_info['calories']}"
                 )
-                async with httpx.AsyncClient() as client:
-                    http_response = await client.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
-                        timeout=30.0
-                    )
-                    logger.info(f"HTTP response for /ingredient to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                    http_response.raise_for_status()
+                await send_message_with_retry(chat_id, response, parse_mode="Markdown")
                 sent_message = await asyncio.wait_for(
-                    update.message.reply_text(response, parse_mode="Markdown"),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /ingredient response to user {user_id}: {choice}, message_id={sent_message.message_id}")
             else:
                 response = "Không tìm thấy món phù hợp với nguyên liệu. Thử lại!"
-                async with httpx.AsyncClient() as client:
-                    http_response = await client.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": response},
-                        timeout=30.0
-                    )
-                    logger.info(f"HTTP response for /ingredient not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                    http_response.raise_for_status()
+                await send_message_with_retry(chat_id, response)
                 sent_message = await asyncio.wait_for(
-                    update.message.reply_text(response),
+                    context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /ingredient not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm"
-            async with httpx.AsyncClient() as client:
-                http_response = await client.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                    json={"chat_id": chat_id, "text": response},
-                    timeout=30.0
-                )
-                logger.info(f"HTTP response for /ingredient usage to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                http_response.raise_for_status()
+            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
-                update.message.reply_text(response),
+                context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
             )
             logger.info(f"✅ Sent /ingredient usage response to user {user_id}: message_id={sent_message.message_id}")
@@ -400,20 +354,10 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     logger.info(f"🎯 LOCATION HANDLER for user {user_id}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         response = "Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu)."
-        async with httpx.AsyncClient() as client:
-            http_response = await client.post(
-                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": response},
-                timeout=30.0
-            )
-            logger.info(f"HTTP response for /location to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-            http_response.raise_for_status()
+        await send_message_with_retry(chat_id, response)
         sent_message = await asyncio.wait_for(
-            update.message.reply_text(response),
+            context.bot.send_message(chat_id=chat_id, text=response),
             timeout=30.0
         )
         logger.info(f"✅ Sent /location response to user {user_id}: message_id={sent_message.message_id}")
@@ -432,54 +376,30 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.location
     logger.info(f"🎯 HANDLE LOCATION for user {user_id}: {location.latitude if location else None}, {location.longitude if location else None}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if location:
             region = "Sài Gòn"  # Giả lập, cần API geocode để thực tế
             foods = REGIONAL_FOODS.get(region, [])
             if foods:
                 response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
-                async with httpx.AsyncClient() as client:
-                    http_response = await client.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
-                        timeout=30.0
-                    )
-                    logger.info(f"HTTP response for location-based to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                    http_response.raise_for_status()
+                await send_message_with_retry(chat_id, response, parse_mode="Markdown")
                 sent_message = await asyncio.wait_for(
-                    update.message.reply_text(response, parse_mode="Markdown"),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent location-based response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
                 response = "Không tìm thấy vùng gần vị trí của bạn."
-                async with httpx.AsyncClient() as client:
-                    http_response = await client.post(
-                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                        json={"chat_id": chat_id, "text": response},
-                        timeout=30.0
-                    )
-                    logger.info(f"HTTP response for location not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                    http_response.raise_for_status()
+                await send_message_with_retry(chat_id, response)
                 sent_message = await asyncio.wait_for(
-                    update.message.reply_text(response),
+                    context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent location not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Vui lòng chia sẻ position."
-            async with httpx.AsyncClient() as client:
-                http_response = await client.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                    json={"chat_id": chat_id, "text": response},
-                    timeout=30.0
-                )
-                logger.info(f"HTTP response for location request to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                http_response.raise_for_status()
+            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
-                update.message.reply_text(response),
+                context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
             )
             logger.info(f"✅ Sent location request response to user {user_id}: message_id={sent_message.message_id}")
@@ -498,9 +418,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     logger.info(f"🎯 ECHO HANDLER for user {user_id}: {text}")
     try:
-        # Check chat permissions
-        chat = await context.bot.get_chat(chat_id)
-        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if text in VIETNAMESE_FOODS:
             food_info = VIETNAMESE_FOODS[text]
             response = (
@@ -512,31 +429,17 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Dịp: {', '.join(food_info['holidays'])}\n"
                 f"- Calo ước tính: {food_info['calories']}"
             )
-            async with httpx.AsyncClient() as client:
-                http_response = await client.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                    json={"chat_id": chat_id, "text": response},
-                    timeout=30.0
-                )
-                logger.info(f"HTTP response for echo to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                http_response.raise_for_status()
+            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
-                update.message.reply_text(response),
+                context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
             )
             logger.info(f"✅ Sent echo response to user {user_id}: {text}, message_id={sent_message.message_id}")
         else:
             response = "Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!"
-            async with httpx.AsyncClient() as client:
-                http_response = await client.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                    json={"chat_id": chat_id, "text": response},
-                    timeout=30.0
-                )
-                logger.info(f"HTTP response for echo not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
-                http_response.raise_for_status()
+            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
-                update.message.reply_text(response),
+                context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
             )
             logger.info(f"✅ Sent echo not found response to user {user_id}: message_id={sent_message.message_id}")
