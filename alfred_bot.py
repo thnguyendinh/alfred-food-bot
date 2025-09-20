@@ -1,3 +1,4 @@
+
 import os
 import logging
 import random
@@ -7,9 +8,8 @@ import pg8000.native
 import sqlite3
 import time
 import httpx
-import threading
 from flask import Flask, request
-from telegram import Update
+from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -38,6 +38,20 @@ logger.info(f"WEBHOOK_URL: {WEBHOOK_URL}")
 logger.info(f"DATABASE_URL: {'Set' if DATABASE_URL else 'Not set'}")
 logger.info(f"PORT: {PORT}")
 logger.info(f"TOKEN: {'Set' if TOKEN else 'Not set'}")
+
+# Validate token
+async def validate_token():
+    try:
+        bot = Bot(TOKEN)
+        bot_info = await bot.get_me()
+        logger.info(f"Bot token is valid: {bot_info}")
+        return True
+    except TelegramError as te:
+        logger.error(f"Invalid bot token: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+        return False
+    except Exception as e:
+        logger.error(f"Error validating token: {e}")
+        return False
 
 # Database
 class Database:
@@ -128,10 +142,13 @@ db = Database()
 
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    logger.info(f"🎯 START HANDLER for user {user_id} in chat {chat_id}")
     try:
-        user_id = str(update.effective_user.id)
-        logger.info(f"🎯 START HANDLER for user {user_id}")
-        
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         response = (
             "Xin chào! Mình là Alfred Food Bot.\n"
             "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
@@ -140,23 +157,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
             "- Gửi tên món: Tra thông tin chi tiết."
         )
-        
-        await asyncio.wait_for(
+        # Log HTTP request
+        async with httpx.AsyncClient() as client:
+            http_response = await client.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": response},
+                timeout=30.0
+            )
+            logger.info(f"HTTP response for /start to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+            http_response.raise_for_status()
+        # Send message
+        sent_message = await asyncio.wait_for(
             update.message.reply_text(response),
-            timeout=10.0
+            timeout=30.0
         )
-        logger.info(f"✅ Successfully sent to user {user_id}")
-        
+        logger.info(f"✅ Sent /start response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT sending to user {user_id}")
+        logger.error(f"❌ TIMEOUT sending /start to user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in /start for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in /start for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ START HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send /start response to user {user_id}: {e}")
 
 async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    logger.info(f"🎯 SUGGEST HANDLER for user {user_id} in chat {chat_id}")
     try:
-        user_id = str(update.effective_user.id)
-        logger.info(f"🎯 SUGGEST HANDLER for user {user_id}")
-        
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         eaten = db.get_eaten(user_id)
         options = [f for f in VIETNAMESE_FOODS.keys() if f not in eaten]
         if not options:
@@ -173,32 +205,45 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- Dịp: {', '.join(food_info['holidays'])}\n"
             f"- Calo ước tính: {food_info['calories']}"
         )
-        
-        await asyncio.wait_for(
+        # Log HTTP request
+        async with httpx.AsyncClient() as client:
+            http_response = await client.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
+                timeout=30.0
+            )
+            logger.info(f"HTTP response for /suggest to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+            http_response.raise_for_status()
+        # Send message
+        sent_message = await asyncio.wait_for(
             update.message.reply_text(response, parse_mode="Markdown"),
-            timeout=10.0
+            timeout=30.0
         )
-        logger.info(f"✅ Successfully suggested {choice} to user {user_id}")
-        
+        logger.info(f"✅ Sent /suggest response to user {user_id}: {choice}, message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT suggesting to user {user_id}")
+        logger.error(f"❌ TIMEOUT sending /suggest to user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in /suggest for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in /suggest for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ SUGGEST HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send /suggest response to user {user_id}: {e}")
 
 async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    logger.info(f"🎯 REGION HANDLER for user {user_id} with args: {context.args}")
     try:
-        user_id = str(update.effective_user.id)
-        logger.info(f"🎯 REGION HANDLER for user {user_id}")
-        
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if context.args:
             user_input = ' '.join(context.args)
             def normalize_string(s):
                 import unicodedata
                 return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
-
             normalized_input = normalize_string(user_input)
             normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
-
             def levenshtein_distance(s1, s2):
                 if len(s1) < len(s2):
                     return levenshtein_distance(s2, s1)
@@ -214,40 +259,72 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         current_row.append(min(insertions, deletions, substitutions))
                     previous_row = current_row
                 return previous_row[-1]
-
             best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
             distance = levenshtein_distance(normalized_input, best_match)
             if distance <= 3:
                 region = normalized_regions[best_match]
                 foods = REGIONAL_FOODS[region]
                 response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
-                await asyncio.wait_for(
+                async with httpx.AsyncClient() as client:
+                    http_response = await client.post(
+                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
+                        timeout=30.0
+                    )
+                    logger.info(f"HTTP response for /region to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                    http_response.raise_for_status()
+                sent_message = await asyncio.wait_for(
                     update.message.reply_text(response, parse_mode="Markdown"),
-                    timeout=10.0
+                    timeout=30.0
                 )
+                logger.info(f"✅ Sent /region response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
                 response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v."
-                await asyncio.wait_for(
+                async with httpx.AsyncClient() as client:
+                    http_response = await client.post(
+                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": response},
+                        timeout=30.0
+                    )
+                    logger.info(f"HTTP response for /region not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                    http_response.raise_for_status()
+                sent_message = await asyncio.wait_for(
                     update.message.reply_text(response),
-                    timeout=10.0
+                    timeout=30.0
                 )
+                logger.info(f"✅ Sent /region not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội"
-            await asyncio.wait_for(
+            async with httpx.AsyncClient() as client:
+                http_response = await client.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": response},
+                    timeout=30.0
+                )
+                logger.info(f"HTTP response for /region usage to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                http_response.raise_for_status()
+            sent_message = await asyncio.wait_for(
                 update.message.reply_text(response),
-                timeout=10.0
+                timeout=30.0
             )
-            
+            logger.info(f"✅ Sent /region usage response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT in region handler for user {user_id}")
+        logger.error(f"❌ TIMEOUT in /region for user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in /region for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in /region for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ REGION HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send /region response to user {user_id}: {e}")
 
 async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    logger.info(f"🎯 INGREDIENT HANDLER for user {user_id} with args: {context.args}")
     try:
-        user_id = str(update.effective_user.id)
-        logger.info(f"🎯 INGREDIENT HANDLER for user {user_id}")
-        
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if context.args:
             user_ingredients = [ing.lower() for ing in ' '.join(context.args).split(',')]
             matching_foods = []
@@ -266,83 +343,164 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"- Dịp: {', '.join(food_info['holidays'])}\n"
                     f"- Calo ước tính: {food_info['calories']}"
                 )
-                await asyncio.wait_for(
+                async with httpx.AsyncClient() as client:
+                    http_response = await client.post(
+                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
+                        timeout=30.0
+                    )
+                    logger.info(f"HTTP response for /ingredient to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                    http_response.raise_for_status()
+                sent_message = await asyncio.wait_for(
                     update.message.reply_text(response, parse_mode="Markdown"),
-                    timeout=10.0
+                    timeout=30.0
                 )
+                logger.info(f"✅ Sent /ingredient response to user {user_id}: {choice}, message_id={sent_message.message_id}")
             else:
                 response = "Không tìm thấy món phù hợp với nguyên liệu. Thử lại!"
-                await asyncio.wait_for(
+                async with httpx.AsyncClient() as client:
+                    http_response = await client.post(
+                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": response},
+                        timeout=30.0
+                    )
+                    logger.info(f"HTTP response for /ingredient not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                    http_response.raise_for_status()
+                sent_message = await asyncio.wait_for(
                     update.message.reply_text(response),
-                    timeout=10.0
+                    timeout=30.0
                 )
+                logger.info(f"✅ Sent /ingredient not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm"
-            await asyncio.wait_for(
+            async with httpx.AsyncClient() as client:
+                http_response = await client.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": response},
+                    timeout=30.0
+                )
+                logger.info(f"HTTP response for /ingredient usage to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                http_response.raise_for_status()
+            sent_message = await asyncio.wait_for(
                 update.message.reply_text(response),
-                timeout=10.0
+                timeout=30.0
             )
-            
+            logger.info(f"✅ Sent /ingredient usage response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT in ingredient handler for user {user_id}")
+        logger.error(f"❌ TIMEOUT in /ingredient for user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in /ingredient for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in /ingredient for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ INGREDIENT HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send /ingredient response to user {user_id}: {e}")
 
 async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    logger.info(f"🎯 LOCATION HANDLER for user {user_id}")
     try:
-        user_id = str(update.effective_user.id)
-        logger.info(f"🎯 LOCATION HANDLER for user {user_id}")
-        
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         response = "Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu)."
-        await asyncio.wait_for(
+        async with httpx.AsyncClient() as client:
+            http_response = await client.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": response},
+                timeout=30.0
+            )
+            logger.info(f"HTTP response for /location to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+            http_response.raise_for_status()
+        sent_message = await asyncio.wait_for(
             update.message.reply_text(response),
-            timeout=10.0
+            timeout=30.0
         )
-        
+        logger.info(f"✅ Sent /location response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT in location handler for user {user_id}")
+        logger.error(f"❌ TIMEOUT in /location for user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in /location for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in /location for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ LOCATION HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send /location response to user {user_id}: {e}")
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    location = update.message.location
+    logger.info(f"🎯 HANDLE LOCATION for user {user_id}: {location.latitude if location else None}, {location.longitude if location else None}")
     try:
-        user_id = str(update.effective_user.id)
-        logger.info(f"🎯 LOCATION HANDLER for user {user_id}")
-        
-        location = update.message.location
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if location:
-            region = "Sài Gòn"
+            region = "Sài Gòn"  # Giả lập, cần API geocode để thực tế
             foods = REGIONAL_FOODS.get(region, [])
             if foods:
                 response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
-                await asyncio.wait_for(
+                async with httpx.AsyncClient() as client:
+                    http_response = await client.post(
+                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": response, "parse_mode": "Markdown"},
+                        timeout=30.0
+                    )
+                    logger.info(f"HTTP response for location-based to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                    http_response.raise_for_status()
+                sent_message = await asyncio.wait_for(
                     update.message.reply_text(response, parse_mode="Markdown"),
-                    timeout=10.0
+                    timeout=30.0
                 )
+                logger.info(f"✅ Sent location-based response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
                 response = "Không tìm thấy vùng gần vị trí của bạn."
-                await asyncio.wait_for(
+                async with httpx.AsyncClient() as client:
+                    http_response = await client.post(
+                        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                        json={"chat_id": chat_id, "text": response},
+                        timeout=30.0
+                    )
+                    logger.info(f"HTTP response for location not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                    http_response.raise_for_status()
+                sent_message = await asyncio.wait_for(
                     update.message.reply_text(response),
-                    timeout=10.0
+                    timeout=30.0
                 )
+                logger.info(f"✅ Sent location not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Vui lòng chia sẻ position."
-            await asyncio.wait_for(
+            async with httpx.AsyncClient() as client:
+                http_response = await client.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": response},
+                    timeout=30.0
+                )
+                logger.info(f"HTTP response for location request to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                http_response.raise_for_status()
+            sent_message = await asyncio.wait_for(
                 update.message.reply_text(response),
-                timeout=10.0
+                timeout=30.0
             )
-            
+            logger.info(f"✅ Sent location request response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT in location handler for user {user_id}")
+        logger.error(f"❌ TIMEOUT in handle_location for user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in handle_location for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in handle_location for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ LOCATION HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send location response to user {user_id}: {e}")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    text = update.message.text.lower()
+    logger.info(f"🎯 ECHO HANDLER for user {user_id}: {text}")
     try:
-        user_id = str(update.effective_user.id)
-        text = update.message.text.lower()
-        logger.info(f"🎯 ECHO HANDLER for user {user_id}: {text}")
-        
+        # Check chat permissions
+        chat = await context.bot.get_chat(chat_id)
+        logger.info(f"Chat permissions for user {user_id}: {chat}")
         if text in VIETNAMESE_FOODS:
             food_info = VIETNAMESE_FOODS[text]
             response = (
@@ -354,30 +512,47 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Dịp: {', '.join(food_info['holidays'])}\n"
                 f"- Calo ước tính: {food_info['calories']}"
             )
-            await asyncio.wait_for(
+            async with httpx.AsyncClient() as client:
+                http_response = await client.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": response},
+                    timeout=30.0
+                )
+                logger.info(f"HTTP response for echo to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                http_response.raise_for_status()
+            sent_message = await asyncio.wait_for(
                 update.message.reply_text(response),
-                timeout=10.0
+                timeout=30.0
             )
+            logger.info(f"✅ Sent echo response to user {user_id}: {text}, message_id={sent_message.message_id}")
         else:
             response = "Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!"
-            await asyncio.wait_for(
+            async with httpx.AsyncClient() as client:
+                http_response = await client.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": response},
+                    timeout=30.0
+                )
+                logger.info(f"HTTP response for echo not found to user {user_id}: status={http_response.status_code}, body={http_response.text}")
+                http_response.raise_for_status()
+            sent_message = await asyncio.wait_for(
                 update.message.reply_text(response),
-                timeout=10.0
+                timeout=30.0
             )
-            
+            logger.info(f"✅ Sent echo not found response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
-        logger.error(f"❌ TIMEOUT in echo handler for user {user_id}")
+        logger.error(f"❌ TIMEOUT in echo for user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in echo for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except httpx.HTTPStatusError as he:
+        logger.error(f"❌ HTTP error in echo for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
-        logger.error(f"❌ ECHO HANDLER ERROR: {e}")
+        logger.error(f"❌ Failed to send echo response to user {user_id}: {e}")
 
 # Build Application
 try:
     logger.info("Building Telegram application...")
-    
-    # Tạo application instance
-    application = ApplicationBuilder().token(TOKEN).build()
-    
-    # Add handlers TRỰC TIẾP vào application
+    application = ApplicationBuilder().token(TOKEN).http_version("1.1").build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("suggest", suggest))
     application.add_handler(CommandHandler("region", region_suggest))
@@ -385,84 +560,46 @@ try:
     application.add_handler(CommandHandler("location", location_suggest))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-    
-    logger.info("Application built successfully with all handlers")
-    
+    logger.info("Application built successfully")
 except Exception as e:
-    logger.error(f"Failed to build application: {e}", exc_info=True)
+    logger.error(f"Failed to build application: {e}")
     raise
 
-# Hàm xử lý update trong background
-# Hàm xử lý update trong background
-def process_update_async(update):
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        # Initialize application nếu chưa initialized
-        if not application.initialized:
-            loop.run_until_complete(application.initialize())
-        
-        # Xử lý update
-        loop.run_until_complete(application.process_update(update))
-        loop.close()
-        logger.info(f"Successfully processed update: {update.update_id}")
-    except Exception as e:
-        logger.error(f"Error processing update in background: {e}")
+# Initialize application
+logger.info("Initializing application...")
+asyncio.get_event_loop().run_until_complete(application.initialize())
+logger.info("Application initialized successfully")
 
 # Flask app for Render webhook
 flask_app = Flask(__name__)
 
 @flask_app.post("/webhook")
-def webhook():
+async def webhook():
     try:
-        # Nhận và parse update
-        update_data = request.get_json()
-        logger.info(f"Received webhook update: {update_data}")
-        
-        if not update_data:
-            logger.warning("Empty update received")
-            return "Empty update", 400
-            
-        update = Update.de_json(update_data, application.bot)
-        
-        # Xử lý update
-        if update and update.message:
-            logger.info(f"Processing update: {update.update_id}, message: {update.message.text}")
-            
-            # PHẢN HỒI NGAY LẬP TỨC trước khi xử lý
-            # Xử lý update trong background (bất đồng bộ)
-            thread = threading.Thread(target=process_update_async, args=(update,))
-            thread.start()
-            
+        json_data = request.get_json(force=True)
+        logger.info(f"Received webhook data: {json_data}")
+        update = Update.de_json(json_data, application.bot)
+        if update:
+            logger.info(f"Processing update: {update.update_id}")
+            await application.process_update(update)
+            logger.info(f"Processed update: {update.update_id}")
             return "ok", 200
         else:
-            logger.warning("Invalid update format")
+            logger.warning("Received invalid update")
             return "Invalid update", 400
-            
     except Exception as e:
-        logger.error(f"Webhook error: {e}", exc_info=True)
+        logger.error(f"Webhook error: {str(e)}", exc_info=True)
         return "Error", 500
 
-@flask_app.get("/")
+@flask_app.get("/webhook")
+def webhook_get():
+    logger.warning("Webhook endpoint only accepts POST requests")
+    return "Method Not Allowed: Use POST for webhook", 405
+
+@flask_app.route("/")
 def index():
-    return "Alfred Food Bot is running!", 200
+    return "Alfred Food Bot running!", 200
 
-# Set webhook on startup
-async def set_webhook():
-    try:
-        await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-        logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-        
-        # Test bot
-        bot_info = await application.bot.get_me()
-        logger.info(f"Bot info: {bot_info}")
-        
-    except Exception as e:
-        logger.error(f"Failed to set webhook: {e}", exc_info=True)
-        raise
-
-# Main
 # Main
 if __name__ == "__main__":
     if not TOKEN:
@@ -473,33 +610,23 @@ if __name__ == "__main__":
         logger.error("WEBHOOK_URL is not set")
         raise ValueError("WEBHOOK_URL is not set")
     
-    async def init_bot():
+    async def set_webhook():
         try:
-            # Initialize application
-            await application.initialize()
-            logger.info("Application initialized successfully")
-            
-            # Set webhook
-            await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-            logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
-            
-            # Test bot
-            bot_info = await application.bot.get_me()
-            logger.info(f"Bot info: {bot_info}")
-            
+            webhook_info = await application.bot.get_webhook_info()
+            logger.info(f"Current webhook info: {webhook_info}")
+            if webhook_info.url != f"{WEBHOOK_URL}/webhook":
+                await application.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+                logger.info(f"Webhook set to {WEBHOOK_URL}/webhook")
+            else:
+                logger.info("Webhook already set correctly")
+        except TelegramError as te:
+            logger.error(f"Failed to set webhook: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+            raise
         except Exception as e:
-            logger.error(f"Failed to initialize bot: {e}", exc_info=True)
+            logger.error(f"Failed to set webhook: {e}")
             raise
     
-    try:
-        # Khởi tạo application
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(init_bot())
-        loop.close()
-        
-        logger.info("🤖 Bot initialized successfully - ready for requests!")
-        
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}", exc_info=True)
-        raise
+    logger.info("Starting bot and setting webhook...")
+    asyncio.get_event_loop().run_until_complete(set_webhook())
+    logger.info("Starting Flask server...")
+    flask_app.run(host="0.0.0.0", port=PORT)
