@@ -7,7 +7,7 @@ import pg8000.native
 import sqlite3
 import time
 from datetime import datetime
-from flask import Flask  # Thêm dòng này
+from flask import Flask, request  # Thêm request vào import
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
