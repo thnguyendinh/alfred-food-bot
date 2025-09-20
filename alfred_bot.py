@@ -7,7 +7,6 @@ import pg8000.native
 import sqlite3
 import time
 from datetime import datetime
-from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,6 +18,7 @@ from telegram.ext import (
 )
 from telegram.error import TelegramError
 from foods_data import VIETNAMESE_FOODS, REGIONAL_FOODS, HOLIDAYS
+import unicodedata
 
 # Logging
 logging.basicConfig(
@@ -39,19 +39,27 @@ logger.info(f"DATABASE_URL: {'Set' if DATABASE_URL else 'Not set'}")
 logger.info(f"PORT: {PORT}")
 logger.info(f"TOKEN: {'Set' if TOKEN else 'Not set'}")
 
-# Validate token
-async def validate_token():
-    try:
-        bot = Bot(TOKEN)
-        bot_info = await bot.get_me()
-        logger.info(f"Bot token is valid: {bot_info}")
-        return True
-    except TelegramError as te:
-        logger.error(f"Invalid bot token: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-        return False
-    except Exception as e:
-        logger.error(f"Error validating token: {e}")
-        return False
+# Hàm chuẩn hóa không dấu
+def normalize_no_diacritics(text):
+    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+    return text.lower()
+
+# Hàm tính Levenshtein distance
+def levenshtein_distance(s1, s2):
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
 
 # Database
 class Database:
@@ -188,7 +196,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🎯 START HANDLER for user {user_id} in chat {chat_id}")
     try:
         response = (
-            "Xin chào! Mình là Alfred Food Bot.\n"
+            "Xin chào! Mình là Alfred Vị Việt.\n"
             "- /suggest [khô/nước]: Gợi ý món ăn ngẫu nhiên, theo loại.\n"
             "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
             "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
@@ -196,7 +204,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /save [món]: Lưu món yêu thích.\n"
             "- /favorites: Xem danh sách món yêu thích.\n"
             "- /donate: Ủng hộ bot.\n"
-            "- Gửi tên món: Tra thông tin chi tiết."
+            "- Gửi tên món: Tra thông tin chi tiết (hỗ trợ không dấu, ví dụ: 'pho')."
         )
         keyboard = [
             [InlineKeyboardButton("Ủng hộ bot ❤️", url="https://paypal.me/alfredfoodbot")],
@@ -295,26 +303,8 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if context.args:
             user_input = ' '.join(context.args)
-            def normalize_string(s):
-                import unicodedata
-                return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
-            normalized_input = normalize_string(user_input)
-            normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
-            def levenshtein_distance(s1, s2):
-                if len(s1) < len(s2):
-                    return levenshtein_distance(s2, s1)
-                if len(s2) == 0:
-                    return len(s1)
-                previous_row = range(len(s2) + 1)
-                for i, c1 in enumerate(s1):
-                    current_row = [i + 1]
-                    for j, c2 in enumerate(s2):
-                        insertions = previous_row[j + 1] + 1
-                        deletions = current_row[j] + 1
-                        substitutions = previous_row[j] + (c1 != c2)
-                        current_row.append(min(insertions, deletions, substitutions))
-                    previous_row = current_row
-                return previous_row[-1]
+            normalized_input = normalize_no_diacritics(user_input)
+            normalized_regions = {normalize_no_diacritics(key): key for key in REGIONAL_FOODS.keys()}
             best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
             distance = levenshtein_distance(normalized_input, best_match)
             if distance <= 3:
@@ -327,14 +317,14 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent /region response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
-                response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v."
+                response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v. (hỗ trợ không dấu, ví dụ: 'sai gon')."
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /region not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội"
+            response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội hoặc sai gon"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -353,10 +343,11 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
     logger.info(f"🎯 INGREDIENT HANDLER for user {user_id} with args: {context.args}")
     try:
         if context.args:
-            user_ingredients = [ing.strip().lower() for ing in ' '.join(context.args).split(',')]
+            user_ingredients = [normalize_no_diacritics(ing.strip()) for ing in ' '.join(context.args).split(',')]
             matching_foods = []
             for food, info in VIETNAMESE_FOODS.items():
-                if any(ing in [i.lower() for i in info['ingredients']] for ing in user_ingredients):
+                normalized_ingredients = [normalize_no_diacritics(i) for i in info['ingredients']]
+                if any(ing in normalized_ingredients for ing in user_ingredients):
                     matching_foods.append(food)
             if matching_foods:
                 choice = random.choice(matching_foods)
@@ -382,14 +373,14 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 logger.info(f"✅ Sent /ingredient response to user {user_id}: {choice}, message_id={sent_message.message_id}")
             else:
-                response = "Không tìm thấy món phù hợp với nguyên liệu. Thử lại!"
+                response = "Không tìm thấy món phù hợp với nguyên liệu. Thử lại! (Hỗ trợ không dấu, ví dụ: 'thit bo')"
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /ingredient not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm"
+            response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm hoặc thit bo, rau thom"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -409,26 +400,8 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if context.args:
             user_input = ' '.join(context.args)
-            def normalize_string(s):
-                import unicodedata
-                return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
-            normalized_input = normalize_string(user_input)
-            normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
-            def levenshtein_distance(s1, s2):
-                if len(s1) < len(s2):
-                    return levenshtein_distance(s2, s1)
-                if len(s2) == 0:
-                    return len(s1)
-                previous_row = range(len(s2) + 1)
-                for i, c1 in enumerate(s1):
-                    current_row = [i + 1]
-                    for j, c2 in enumerate(s2):
-                        insertions = previous_row[j + 1] + 1
-                        deletions = current_row[j] + 1
-                        substitutions = previous_row[j] + (c1 != c2)
-                        current_row.append(min(insertions, deletions, substitutions))
-                    previous_row = current_row
-                return previous_row[-1]
+            normalized_input = normalize_no_diacritics(user_input)
+            normalized_regions = {normalize_no_diacritics(key): key for key in REGIONAL_FOODS.keys()}
             best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
             distance = levenshtein_distance(normalized_input, best_match)
             if distance <= 3:
@@ -441,14 +414,14 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent /location response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
-                response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v., hoặc chia sẻ vị trí GPS."
+                response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v., hoặc chia sẻ vị trí GPS (hỗ trợ không dấu, ví dụ: 'sai gon')."
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /location not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Chia sẻ vị trí GPS của bạn (nút 'Location') hoặc nhập vùng, ví dụ: /location Hà Nội"
+            response = "Chia sẻ vị trí GPS của bạn (nút 'Location') hoặc nhập vùng, ví dụ: /location Hà Nội hoặc sai gon"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -504,8 +477,13 @@ async def save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🎯 SAVE HANDLER for user {user_id} with args: {context.args}")
     try:
         if context.args:
-            food = ' '.join(context.args).lower()
-            if food in VIETNAMESE_FOODS:
+            user_input = ' '.join(context.args)
+            normalized_input = normalize_no_diacritics(user_input)
+            normalized_foods = {normalize_no_diacritics(food): food for food in VIETNAMESE_FOODS.keys()}
+            best_match = min(normalized_foods.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
+            distance = levenshtein_distance(normalized_input, best_match)
+            if distance <= 3:
+                food = normalized_foods[best_match]
                 db.add_favorite(user_id, food)
                 response = f"Đã lưu *{food}* vào danh sách yêu thích!"
                 sent_message = await asyncio.wait_for(
@@ -514,14 +492,14 @@ async def save(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent /save response to user {user_id}: {food}, message_id={sent_message.message_id}")
             else:
-                response = f"Món *{food}* không có trong danh sách. Thử /suggest để xem các món!"
+                response = f"Món '{user_input}' không có trong danh sách. Thử /suggest để xem các món! (Hỗ trợ không dấu, ví dụ: 'pho')"
                 sent_message = await asyncio.wait_for(
-                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
+                    context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent /save not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Sử dụng: /save [tên món], ví dụ: /save Phở"
+            response = "Sử dụng: /save [tên món], ví dụ: /save Phở hoặc pho"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -551,7 +529,7 @@ async def favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.info(f"✅ Sent /favorites response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Bạn chưa có món yêu thích nào. Dùng /save [món] để lưu!"
+            response = "Bạn chưa có món yêu thích nào. Dùng /save [món] để lưu! (Hỗ trợ không dấu, ví dụ: /save pho)"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -570,7 +548,7 @@ async def donate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🎯 DONATE HANDLER for user {user_id}")
     try:
         response = (
-            "Cảm ơn bạn đã sử dụng Alfred Food Bot! ❤️\n"
+            "Cảm ơn bạn đã sử dụng Alfred Vị Việt! ❤️\n"
             "Nếu bạn thấy bot hữu ích, hãy ủng hộ mình để duy trì và phát triển nhé!\n"
             "Nhấn nút dưới để donate qua PayPal hoặc Momo."
         )
@@ -594,13 +572,18 @@ async def donate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
-    text = update.message.text.lower()
+    text = update.message.text
     logger.info(f"🎯 ECHO HANDLER for user {user_id}: {text}")
     try:
-        if text in VIETNAMESE_FOODS:
-            food_info = VIETNAMESE_FOODS[text]
+        normalized_input = normalize_no_diacritics(text)
+        normalized_foods = {normalize_no_diacritics(food): food for food in VIETNAMESE_FOODS.keys()}
+        best_match = min(normalized_foods.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
+        distance = levenshtein_distance(normalized_input, best_match)
+        if distance <= 3:
+            food = normalized_foods[best_match]
+            food_info = VIETNAMESE_FOODS[food]
             response = (
-                f"{text} là món ăn nổi tiếng!\n"
+                f"{food} là món ăn nổi tiếng!\n"
                 f"- Loại: {food_info['type']}\n"
                 f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
                 f"- Cách làm: {food_info['recipe']}\n"
@@ -609,16 +592,16 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Calo ước tính: {food_info['calories']}"
             )
             keyboard = [
-                [InlineKeyboardButton("Lưu món này", callback_data=f"save_{text}")]
+                [InlineKeyboardButton("Lưu món này", callback_data=f"save_{food}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response, reply_markup=reply_markup),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
                 timeout=30.0
             )
-            logger.info(f"✅ Sent echo response to user {user_id}: {text}, message_id={sent_message.message_id}")
+            logger.info(f"✅ Sent echo response to user {user_id}: {food}, message_id={sent_message.message_id}")
         else:
-            response = "Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!"
+            response = f"Món '{text}' chưa có trong danh sách. Thử /suggest để gợi ý mới! (Hỗ trợ không dấu, ví dụ: 'pho')"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -774,7 +757,7 @@ def webhook_get():
 
 @flask_app.route("/")
 def index():
-    return "Alfred Food Bot running!", 200
+    return "Alfred Vị Việt running!", 200
 
 # Main
 if __name__ == "__main__":
