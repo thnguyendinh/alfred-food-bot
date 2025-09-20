@@ -574,14 +574,14 @@ logger.info("Application initialized successfully")
 flask_app = Flask(__name__)
 
 @flask_app.post("/webhook")
-async def webhook():
+def webhook():
     try:
         json_data = request.get_json(force=True)
         logger.info(f"Received webhook data: {json_data}")
         update = Update.de_json(json_data, application.bot)
         if update:
             logger.info(f"Processing update: {update.update_id}")
-            await application.process_update(update)
+            asyncio.run_coroutine_threadsafe(application.process_update(update), asyncio.get_event_loop())
             logger.info(f"Processed update: {update.update_id}")
             return "ok", 200
         else:
