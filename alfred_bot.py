@@ -7,9 +7,8 @@ import urllib.parse
 import pg8000.native
 import sqlite3
 import time
-import httpx
 from flask import Flask, request
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -140,28 +139,6 @@ class Database:
 
 db = Database()
 
-# HTTPX client with retries
-async def send_message_with_retry(chat_id, text, parse_mode=None, retries=3, timeout=30.0):
-    async with httpx.AsyncClient() as client:
-        for attempt in range(retries):
-            try:
-                payload = {"chat_id": chat_id, "text": text}
-                if parse_mode:
-                    payload["parse_mode"] = parse_mode
-                http_response = await client.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                    json=payload,
-                    timeout=timeout
-                )
-                logger.info(f"HTTP response: chat_id={chat_id}, attempt={attempt+1}, status={http_response.status_code}, body={http_response.text}")
-                http_response.raise_for_status()
-                return http_response
-            except (httpx.TimeoutException, httpx.RequestError) as e:
-                logger.warning(f"Attempt {attempt+1}/{retries} failed for chat_id={chat_id}: {e}")
-                if attempt + 1 == retries:
-                    raise
-                await asyncio.sleep(1)
-
 # Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -173,12 +150,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /suggest: Gợi ý món ăn ngẫu nhiên.\n"
             "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
             "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
-            "- /location: Chia sẻ vị trí để gợi ý món địa phương.\n"
+            "- /location [tên vùng]: Gợi ý món theo vùng hoặc chia sẻ vị trí GPS.\n"
             "- Gửi tên món: Tra thông tin chi tiết."
         )
-        # Send message with retry
-        await send_message_with_retry(chat_id, response)
-        # Send message via Bot
         sent_message = await asyncio.wait_for(
             context.bot.send_message(chat_id=chat_id, text=response),
             timeout=30.0
@@ -188,8 +162,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ TIMEOUT sending /start to user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in /start for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in /start for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send /start response to user {user_id}: {e}")
 
@@ -214,9 +186,6 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"- Dịp: {', '.join(food_info['holidays'])}\n"
             f"- Calo ước tính: {food_info['calories']}"
         )
-        # Send message with retry
-        await send_message_with_retry(chat_id, response, parse_mode="Markdown")
-        # Send message via Bot
         sent_message = await asyncio.wait_for(
             context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
             timeout=30.0
@@ -226,8 +195,6 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ TIMEOUT sending /suggest to user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in /suggest for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in /suggest for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send /suggest response to user {user_id}: {e}")
 
@@ -264,7 +231,6 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 region = normalized_regions[best_match]
                 foods = REGIONAL_FOODS[region]
                 response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
-                await send_message_with_retry(chat_id, response, parse_mode="Markdown")
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
@@ -272,7 +238,6 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"✅ Sent /region response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
                 response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v."
-                await send_message_with_retry(chat_id, response)
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
@@ -280,7 +245,6 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"✅ Sent /region not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội"
-            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -290,8 +254,6 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ TIMEOUT in /region for user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in /region for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in /region for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send /region response to user {user_id}: {e}")
 
@@ -301,7 +263,7 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
     logger.info(f"🎯 INGREDIENT HANDLER for user {user_id} with args: {context.args}")
     try:
         if context.args:
-            user_ingredients = [ing.lower() for ing in ' '.join(context.args).split(',')]
+            user_ingredients = [ing.strip().lower() for ing in ' '.join(context.args).split(',')]
             matching_foods = []
             for food, info in VIETNAMESE_FOODS.items():
                 if any(ing in [i.lower() for i in info['ingredients']] for ing in user_ingredients):
@@ -318,7 +280,6 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"- Dịp: {', '.join(food_info['holidays'])}\n"
                     f"- Calo ước tính: {food_info['calories']}"
                 )
-                await send_message_with_retry(chat_id, response, parse_mode="Markdown")
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
@@ -326,7 +287,6 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 logger.info(f"✅ Sent /ingredient response to user {user_id}: {choice}, message_id={sent_message.message_id}")
             else:
                 response = "Không tìm thấy món phù hợp với nguyên liệu. Thử lại!"
-                await send_message_with_retry(chat_id, response)
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
@@ -334,7 +294,6 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 logger.info(f"✅ Sent /ingredient not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm"
-            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -344,29 +303,65 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.error(f"❌ TIMEOUT in /ingredient for user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in /ingredient for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in /ingredient for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send /ingredient response to user {user_id}: {e}")
 
 async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     chat_id = update.effective_chat.id
-    logger.info(f"🎯 LOCATION HANDLER for user {user_id}")
+    logger.info(f"🎯 LOCATION HANDLER for user {user_id} with args: {context.args}")
     try:
-        response = "Chia sẻ vị trí của bạn để tôi gợi ý món địa phương (chỉ dùng để gợi ý, không lưu)."
-        await send_message_with_retry(chat_id, response)
-        sent_message = await asyncio.wait_for(
-            context.bot.send_message(chat_id=chat_id, text=response),
-            timeout=30.0
-        )
-        logger.info(f"✅ Sent /location response to user {user_id}: message_id={sent_message.message_id}")
+        if context.args:
+            user_input = ' '.join(context.args)
+            def normalize_string(s):
+                import unicodedata
+                return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8').lower()
+            normalized_input = normalize_string(user_input)
+            normalized_regions = {normalize_string(key): key for key in REGIONAL_FOODS.keys()}
+            def levenshtein_distance(s1, s2):
+                if len(s1) < len(s2):
+                    return levenshtein_distance(s2, s1)
+                if len(s2) == 0:
+                    return len(s1)
+                previous_row = range(len(s2) + 1)
+                for i, c1 in enumerate(s1):
+                    current_row = [i + 1]
+                    for j, c2 in enumerate(s2):
+                        insertions = previous_row[j + 1] + 1
+                        deletions = current_row[j] + 1
+                        substitutions = previous_row[j] + (c1 != c2)
+                        current_row.append(min(insertions, deletions, substitutions))
+                    previous_row = current_row
+                return previous_row[-1]
+            best_match = min(normalized_regions.keys(), key=lambda k: levenshtein_distance(normalized_input, k))
+            distance = levenshtein_distance(normalized_input, best_match)
+            if distance <= 3:
+                region = normalized_regions[best_match]
+                foods = REGIONAL_FOODS[region]
+                response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
+                sent_message = await asyncio.wait_for(
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
+                    timeout=30.0
+                )
+                logger.info(f"✅ Sent /location response to user {user_id}: {region}, message_id={sent_message.message_id}")
+            else:
+                response = f"Không tìm thấy vùng '{user_input}'. Thử 'Hà Nội', 'Sài Gòn', v.v., hoặc chia sẻ vị trí GPS."
+                sent_message = await asyncio.wait_for(
+                    context.bot.send_message(chat_id=chat_id, text=response),
+                    timeout=30.0
+                )
+                logger.info(f"✅ Sent /location not found response to user {user_id}: message_id={sent_message.message_id}")
+        else:
+            response = "Chia sẻ vị trí GPS của bạn (nút 'Location') hoặc nhập vùng, ví dụ: /location Hà Nội"
+            sent_message = await asyncio.wait_for(
+                context.bot.send_message(chat_id=chat_id, text=response),
+                timeout=30.0
+            )
+            logger.info(f"✅ Sent /location usage response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
         logger.error(f"❌ TIMEOUT in /location for user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in /location for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in /location for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send /location response to user {user_id}: {e}")
 
@@ -381,7 +376,6 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             foods = REGIONAL_FOODS.get(region, [])
             if foods:
                 response = f"Dựa trên vị trí, vùng gần: *{region}*. Món gợi ý: {', '.join(foods)}"
-                await send_message_with_retry(chat_id, response, parse_mode="Markdown")
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
@@ -389,15 +383,13 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"✅ Sent location-based response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
                 response = "Không tìm thấy vùng gần vị trí của bạn."
-                await send_message_with_retry(chat_id, response)
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent location not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Vui lòng chia sẻ position."
-            await send_message_with_retry(chat_id, response)
+            response = "Vui lòng chia sẻ vị trí GPS bằng nút 'Location'."
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -407,8 +399,6 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ TIMEOUT in handle_location for user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in handle_location for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in handle_location for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send location response to user {user_id}: {e}")
 
@@ -429,7 +419,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Dịp: {', '.join(food_info['holidays'])}\n"
                 f"- Calo ước tính: {food_info['calories']}"
             )
-            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -437,7 +426,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"✅ Sent echo response to user {user_id}: {text}, message_id={sent_message.message_id}")
         else:
             response = "Mình chưa có thông tin món này. Thử /suggest để gợi ý mới!"
-            await send_message_with_retry(chat_id, response)
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response),
                 timeout=30.0
@@ -447,8 +435,6 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ TIMEOUT in echo for user {user_id}")
     except TelegramError as te:
         logger.error(f"❌ Telegram error in echo for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
-    except httpx.HTTPStatusError as he:
-        logger.error(f"❌ HTTP error in echo for user {user_id}: status={he.response.status_code}, body={he.response.text}")
     except Exception as e:
         logger.error(f"❌ Failed to send echo response to user {user_id}: {e}")
 
