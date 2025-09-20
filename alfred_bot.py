@@ -1,4 +1,4 @@
-
+```python
 import os
 import logging
 import random
@@ -560,7 +560,7 @@ try:
     application.add_handler(CommandHandler("location", location_suggest))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-    logger.info("Application built successfully")
+    logger.info("Application built successfully with handlers: start, suggest, region, ingredient, location, location_message, echo")
 except Exception as e:
     logger.error(f"Failed to build application: {e}")
     raise
@@ -580,8 +580,9 @@ def webhook():
         logger.info(f"Received webhook data: {json_data}")
         update = Update.de_json(json_data, application.bot)
         if update:
-            logger.info(f"Processing update: {update.update_id}")
-            asyncio.run_coroutine_threadsafe(application.process_update(update), asyncio.get_event_loop())
+            logger.info(f"Parsed update: update_id={update.update_id}, message={update.message.text if update.message else None}")
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(application.process_update(update))
             logger.info(f"Processed update: {update.update_id}")
             return "ok", 200
         else:
@@ -630,3 +631,4 @@ if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(set_webhook())
     logger.info("Starting Flask server...")
     flask_app.run(host="0.0.0.0", port=PORT)
+```
