@@ -143,17 +143,33 @@ class Database:
         timestamp = int(time.time())
         if self.use_mongo:
             try:
+                # Thêm món mới
                 self.collections['eaten_foods'].insert_one({
                     "user_id": user_id,
                     "food": food,
                     "timestamp": timestamp
                 })
+                # Giữ chỉ 15 món gần nhất
+                cursor = self.collections['eaten_foods'].find({"user_id": user_id}).sort("timestamp", -1).skip(15)
+                old_entries = [doc["_id"] for doc in cursor]
+                if old_entries:
+                    self.collections['eaten_foods'].delete_many({"_id": {"$in": old_entries}})
                 logger.info(f"Added food {food} to eaten_foods for user {user_id} in MongoDB")
             except Exception as e:
                 logger.error(f"MongoDB add eaten error: {e}")
         else:
             try:
                 self.sqlite_conn.execute("INSERT INTO eaten_foods (user_id, food, timestamp) VALUES (?, ?, ?)", (user_id, food, timestamp))
+                # Giữ chỉ 15 món gần nhất
+                self.sqlite_conn.execute("""
+                    DELETE FROM eaten_foods 
+                    WHERE user_id = ? 
+                    AND timestamp NOT IN (
+                        SELECT timestamp FROM eaten_foods 
+                        WHERE user_id = ? 
+                        ORDER BY timestamp DESC 
+                        LIMIT 15
+                    )""", (user_id, user_id))
                 self.sqlite_conn.commit()
                 logger.info(f"Added food {food} to eaten_foods for user {user_id} in SQLite")
             except Exception as e:
@@ -267,24 +283,43 @@ class Database:
                 cursor = self.sqlite_conn.execute("SELECT name, latitude, longitude, review, rating FROM restaurants WHERE user_id=? ORDER BY timestamp DESC", (user_id,))
                 return [dict(name=r[0], latitude=r[1], longitude=r[2], review=r[3], rating=r[4]) for r in cursor.fetchall()]
             except Exception as e:
-                logger.error(f"SQLite get user restaurants error: {e}")
+                logger.error(f"MongoDB get user restaurants error: {e}")
                 return []
 
     def get_all_restaurants(self):
         if self.use_mongo:
             try:
-                cursor = self.collections['restaurants'].find().sort("timestamp", -1)
+                cursor = self.collections['restaurants'].find().sort([("rating", -1), ("timestamp", -1)]).limit(20)
                 return [dict(user_id=doc["user_id"], name=doc["name"], latitude=doc["latitude"], longitude=doc["longitude"], review=doc["review"], rating=doc["rating"]) for doc in cursor]
             except Exception as e:
                 logger.error(f"MongoDB get all restaurants error: {e}")
                 return []
         else:
             try:
-                cursor = self.sqlite_conn.execute("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants ORDER BY timestamp DESC")
+                cursor = self.sqlite_conn.execute("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants ORDER BY rating DESC, timestamp DESC LIMIT 20")
                 return [dict(user_id=r[0], name=r[1], latitude=r[2], longitude=r[3], review=r[4], rating=r[5]) for r in cursor.fetchall()]
             except Exception as e:
                 logger.error(f"SQLite get all restaurants error: {e}")
                 return []
+
+    def delete_restaurant(self, user_id, name):
+        if self.use_mongo:
+            try:
+                result = self.collections['restaurants'].delete_one({"user_id": user_id, "name": name})
+                logger.info(f"Deleted restaurant {name} for user {user_id} in MongoDB")
+                return result.deleted_count > 0
+            except Exception as e:
+                logger.error(f"MongoDB delete restaurant error: {e}")
+                return False
+        else:
+            try:
+                self.sqlite_conn.execute("DELETE FROM restaurants WHERE user_id=? AND name=?", (user_id, name))
+                self.sqlite_conn.commit()
+                logger.info(f"Deleted restaurant {name} for user {user_id} in SQLite")
+                return self.sqlite_conn.total_changes > 0
+            except Exception as e:
+                logger.error(f"SQLite delete restaurant error: {e}")
+                return False
 
 db = Database()
 
@@ -654,17 +689,17 @@ async def restaurant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         # Lấy danh sách quán ăn của người dùng hiện tại
         user_restaurants = db.get_user_restaurants(user_id)
-        # Lấy tất cả quán ăn từ database
+        # Lấy top 20 quán ăn có đánh giá cao nhất
         all_restaurants = db.get_all_restaurants()
         # Lọc danh sách quán ăn của người dùng khác
         other_restaurants = [r for r in all_restaurants if r['user_id'] != user_id]
 
-        response = "🏪 *Danh sách quán ăn*\n\n"
+        response = "🏪 *Danh sách quán ăn (Top 20 theo đánh giá)*\n\n"
         
         # Hiển thị quán ăn của người dùng
         if user_restaurants:
             response += "🍽 *Quán ăn bạn đã lưu:*\n"
-            for r in user_restaurants[:5]:  # Giới hạn 5 quán để tránh quá dài
+            for r in user_restaurants[:5]:  # Giới hạn 5 quán của người dùng
                 map_link = f"https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}"
                 response += (
                     f"- *{r['name']}* ({r['rating']} ⭐)\n"
@@ -674,10 +709,10 @@ async def restaurant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             response += "😔 Bạn chưa lưu quán ăn nào. Gửi vị trí GPS và chọn 'Lưu quán ăn' để bắt đầu!\n"
 
-        # Hiển thị quán ăn của người dùng khác
+        # Hiển thị quán ăn của người dùng khác (tối đa 20, đã được giới hạn trong get_all_restaurants)
         if other_restaurants:
-            response += "\n🌐 *Quán ăn từ người dùng khác:*\n"
-            for r in other_restaurants[:5]:  # Giới hạn 5 quán để tránh quá dài
+            response += "\n🌐 *Quán ăn từ người dùng khác (Top đánh giá):*\n"
+            for r in other_restaurants[:15]:  # Giới hạn 15 để tổng cộng không quá 20
                 map_link = f"https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}"
                 response += (
                     f"- *{r['name']}* ({r['rating']} ⭐)\n"
@@ -707,17 +742,23 @@ async def my_restaurants(update: Update, context: ContextTypes.DEFAULT_TYPE):
         restaurants = db.get_user_restaurants(user_id)
         if restaurants:
             response = "🍽 *Quán ăn bạn đã lưu:*\n"
-            for r in restaurants[:5]:
+            keyboard = []
+            for r in restaurants[:5]:  # Giới hạn 5 quán
                 map_link = f"https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}"
                 response += (
                     f"- *{r['name']}* ({r['rating']} ⭐)\n"
                     f"  Đánh giá: {r['review']}\n"
                     f"  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ]({map_link}))\n"
                 )
+                keyboard.append([
+                    InlineKeyboardButton(f"🗑 Xoá {r['name']}", callback_data=f"delete_restaurant_{r['name']}")
+                ])
+            reply_markup = InlineKeyboardMarkup(keyboard)
         else:
             response = "😔 Bạn chưa lưu quán ăn nào. Gửi vị trí GPS và chọn 'Lưu quán ăn' để bắt đầu!"
+            reply_markup = None
         sent_message = await asyncio.wait_for(
-            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", disable_web_page_preview=True),
+            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", disable_web_page_preview=True, reply_markup=reply_markup),
             timeout=30.0
         )
         logger.info(f"✅ Sent myrestaurants response to user {user_id}: message_id={sent_message.message_id}")
@@ -891,6 +932,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.info(f"✅ Sent delete favorite response to user {user_id}: {food}, message_id={sent_message.message_id}")
             await favorites(update, context)
+        elif data.startswith("delete_restaurant_"):
+            restaurant_name = data.replace("delete_restaurant_", "")
+            if db.delete_restaurant(user_id, restaurant_name):
+                response = f"🗑 Đã xoá quán *{restaurant_name}* khỏi danh sách của bạn!"
+            else:
+                response = f"❌ Không thể xoá quán *{restaurant_name}*. Vui lòng thử lại."
+            sent_message = await asyncio.wait_for(
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
+                timeout=30.0
+            )
+            logger.info(f"✅ Sent delete restaurant response to user {user_id}: {restaurant_name}, message_id={sent_message.message_id}")
+            await my_restaurants(update, context)  # Cập nhật danh sách sau khi xoá
         elif data == "suggest":
             eaten_foods = db.get_eaten(user_id)
             available_foods = [food for food in VIETNAMESE_FOODS.keys() if food not in eaten_foods]
