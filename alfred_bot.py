@@ -208,7 +208,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- Gửi tên món: Tra thông tin chi tiết (hỗ trợ không dấu, ví dụ: 'pho')."
         )
         keyboard = [
-            [InlineKeyboardButton("Ủng hộ bot ❤️", url="https://paypal.me/alfredfoodbot")],
+            [InlineKeyboardButton("Ủng hộ bot ❤️", url="https://viettelmoney.go.link/fuCfu")],
             [InlineKeyboardButton("Gợi ý món ngay!", callback_data="suggest")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
