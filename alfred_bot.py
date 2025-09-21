@@ -581,19 +581,22 @@ async def holiday_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent holiday response to user {user_id}: {holiday}, message_id={sent_message.message_id}")
             else:
-                response = f"😔 Không tìm thấy ngày lễ '{ ' '.join(context.args) }'. Thử 'Tết Nguyên Đán', 'Trung Thu' (hỗ trợ không dấu)."
+                response = f"😔 Không tìm thấy ngày lễ '{ ' '.join(context.args) }'. Dưới đây là các dịp lễ hiện có:\n"
+                response += "\n".join(f"- *{holiday}*" for holiday in HOLIDAYS.keys())
+                response += "\n\nSử dụng: /holiday [tên ngày lễ], ví dụ: /holiday Tết Nguyên Đán hoặc tet nguyen dan"
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent holiday not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Sử dụng: /holiday [tên ngày lễ], ví dụ: /holiday Tết Nguyên Đán hoặc tet nguyen dan"
+            response = "🎊 Các dịp lễ hiện có:\n" + "\n".join(f"- *{holiday}*" for holiday in HOLIDAYS.keys())
+            response += "\n\nSử dụng: /holiday [tên ngày lễ], ví dụ: /holiday Tết Nguyên Đán để xem món ăn phù hợp."
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
-            logger.info(f"✅ Sent holiday usage response to user {user_id}: message_id={sent_message.message_id}")
+            logger.info(f"✅ Sent holiday list response to user {user_id}: message_id={sent_message.message_id}")
     except asyncio.TimeoutError:
         logger.error(f"❌ TIMEOUT in /holiday for user {user_id}")
     except TelegramError as te:
