@@ -261,7 +261,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
             "- /location [tên vùng]: Gợi ý món theo vùng hoặc chia sẻ vị trí GPS.\n"
             "- /save [món]: Lưu món yêu thích.\n"
-            "- /favorites: Xem danh sách món yêu thích.\n"
+            "- /favorites [món]: Xem món yêu thích.\n"
+            "- /restaurant [món]: Tổng hợp quán ăn.\n"
+            "- /myrestaurants: Xem danh sách quán ăn đã lưu.\n"
             "- /donate: Ủng hộ bot.\n"
             "- Gửi tên món: Tra thông tin chi tiết (hỗ trợ không dấu, ví dụ: 'pho')."
         )
