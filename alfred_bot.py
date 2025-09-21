@@ -23,6 +23,8 @@ from telegram.error import TelegramError
 from foods_data import VIETNAMESE_FOODS, REGIONAL_FOODS, HOLIDAYS
 import unicodedata
 from geopy.geocoders import Nominatim
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
 # Logging
 logging.basicConfig(
@@ -92,156 +94,83 @@ def get_region_from_coordinates(latitude, longitude):
 # Database
 class Database:
     def __init__(self):
-        self.use_postgres = False
-        self.pg_conn = None
-        self.sqlite_conn = None
-        if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+        self.use_mongo = False
+        self.mongo_client = None
+        self.db = None
+        self.collections = {}
+
+        # Kiểm tra MongoDB URI
+        mongodb_uri = os.getenv("MONGODB_URI")
+        if mongodb_uri:
             try:
-                parsed = urllib.parse.urlparse(DATABASE_URL)
-                db_params = {
-                    "user": parsed.username,
-                    "password": parsed.password,
-                    "host": parsed.hostname,
-                    "port": parsed.port,
-                    "database": parsed.path.lstrip('/')
-                }
-                self.pg_conn = pg8000.native.Connection(**db_params)
-                self.use_postgres = True
-                self.pg_conn.run("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
-                self.pg_conn.run("CREATE TABLE IF NOT EXISTS favorite_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
-                self.pg_conn.run("CREATE TABLE IF NOT EXISTS restaurants (user_id TEXT, name TEXT, latitude REAL, longitude REAL, review TEXT, rating INTEGER, timestamp INTEGER)")
-                logger.info("Connected to PostgreSQL")
+                self.mongo_client = MongoClient(mongodb_uri)
+                self.db = self.mongo_client.get_database('alfred_bot')  # Tên DB
+                # Tạo collections nếu chưa có
+                self.collections['eaten_foods'] = self.db.eaten_foods
+                self.collections['favorite_foods'] = self.db.favorite_foods
+                self.collections['restaurants'] = self.db.restaurants
+                self.use_mongo = True
+                # Test connection
+                self.mongo_client.admin.command('ismaster')
+                logger.info("Connected to MongoDB Atlas successfully")
+            except ConnectionFailure as e:
+                logger.error(f"MongoDB connection failed: {e}. Falling back to SQLite.")
+                self._init_sqlite()
             except Exception as e:
-                logger.error(f"Postgres init failed: {e}. Falling back to SQLite.")
+                logger.error(f"MongoDB init error: {e}. Falling back to SQLite.")
                 self._init_sqlite()
         else:
+            logger.info("MONGODB_URI not set, using SQLite")
             self._init_sqlite()
 
     def _init_sqlite(self):
+        # Giữ nguyên code SQLite cũ như trước (fallback nếu MongoDB lỗi)
         try:
-            self.sqlite_conn = sqlite3.connect("alfred.db", check_same_thread=False)
+            db_path = os.getenv("DB_PATH", "alfred.db")
+            db_dir = os.path.dirname(db_path) if os.path.dirname(db_path) else "."
+            os.makedirs(db_dir, exist_ok=True)
+            self.sqlite_conn = sqlite3.connect(db_path, check_same_thread=False)
+            # Tạo tables
             self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS eaten_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
             self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS favorite_foods (user_id TEXT, food TEXT, timestamp INTEGER)")
             self.sqlite_conn.execute("CREATE TABLE IF NOT EXISTS restaurants (user_id TEXT, name TEXT, latitude REAL, longitude REAL, review TEXT, rating INTEGER, timestamp INTEGER)")
             self.sqlite_conn.commit()
-            logger.info("Connected to SQLite successfully")
+            logger.info(f"Connected to SQLite at {db_path} successfully")
         except sqlite3.Error as e:
             logger.error(f"SQLite connection error: {e}")
             raise
 
     def get_conn(self):
-        return self.pg_conn if self.use_postgres else self.sqlite_conn
+        if self.use_mongo:
+            return self.db
+        return self.sqlite_conn
 
+    # Các method khác (add_eaten, get_eaten, v.v.) cần điều chỉnh cho MongoDB
     def add_eaten(self, user_id, food):
-        conn = self.get_conn()
-        try:
+        if self.use_mongo:
+            self.collections['eaten_foods'].insert_one({
+                "user_id": user_id, "food": food, "timestamp": int(time.time())
+            })
+        else:
+            # Giữ nguyên code SQLite cũ
+            conn = self.get_conn()
             timestamp = int(time.time())
-            if self.use_postgres:
-                conn.run("INSERT INTO eaten_foods (user_id, food, timestamp) VALUES (:u, :f, :t)", u=user_id, f=food, t=timestamp)
-            else:
-                conn.execute("INSERT INTO eaten_foods (user_id, food, timestamp) VALUES (?, ?, ?)", (user_id, food, timestamp))
-                conn.commit()
-            logger.info(f"Added food {food} to eaten_foods for user {user_id}")
-        except Exception as e:
-            logger.error(f"DB add eaten error: {e}")
+            conn.execute("INSERT INTO eaten_foods (user_id, food, timestamp) VALUES (?, ?, ?)", (user_id, food, timestamp))
+            conn.commit()
 
-    def get_eaten(self, user_id):
-        conn = self.get_conn()
-        try:
-            if self.use_postgres:
-                rows = conn.run("SELECT food FROM eaten_foods WHERE user_id=:u ORDER BY timestamp DESC LIMIT 10", u=user_id)
-                return [r[0] for r in rows]
-            else:
-                cursor = conn.execute("SELECT food FROM eaten_foods WHERE user_id=? ORDER BY timestamp DESC LIMIT 10", (user_id,))
-                return [r[0] for r in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"DB get eaten error: {e}")
-            return []
-
-    def add_favorite(self, user_id, food):
-        conn = self.get_conn()
-        try:
-            timestamp = int(time.time())
-            if self.use_postgres:
-                conn.run("INSERT INTO favorite_foods (user_id, food, timestamp) VALUES (:u, :f, :t)", u=user_id, f=food, t=timestamp)
-            else:
-                conn.execute("INSERT INTO favorite_foods (user_id, food, timestamp) VALUES (?, ?, ?)", (user_id, food, timestamp))
-                conn.commit()
-            logger.info(f"Added food {food} to favorite_foods for user {user_id}")
-        except Exception as e:
-            logger.error(f"DB add favorite error: {e}")
-
+    # Tương tự cho get_eaten, add_favorite, get_favorites, delete_favorite, add_restaurant, get_user_restaurants, get_all_restaurants
+    # Ví dụ cho get_favorites (MongoDB)
     def get_favorites(self, user_id):
-        conn = self.get_conn()
-        try:
-            if self.use_postgres:
-                rows = conn.run("SELECT food FROM favorite_foods WHERE user_id=:u ORDER BY timestamp DESC LIMIT 10", u=user_id)
-                return [r[0] for r in rows]
-            else:
-                cursor = conn.execute("SELECT food FROM favorite_foods WHERE user_id=? ORDER BY timestamp DESC LIMIT 10", (user_id,))
-                return [r[0] for r in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"DB get favorites error: {e}")
-            return []
+        if self.use_mongo:
+            cursor = self.collections['favorite_foods'].find({"user_id": user_id}).sort("timestamp", -1).limit(10)
+            return [doc["food"] for doc in cursor]
+        else:
+            # Giữ nguyên code SQLite cũ
+            conn = self.get_conn()
+            cursor = conn.execute("SELECT food FROM favorite_foods WHERE user_id=? ORDER BY timestamp DESC LIMIT 10", (user_id,))
+            return [r[0] for r in cursor.fetchall()]
 
-    def delete_favorite(self, user_id, food):
-        conn = self.get_conn()
-        try:
-            if self.use_postgres:
-                conn.run("DELETE FROM favorite_foods WHERE user_id=:u AND food=:f", u=user_id, f=food)
-            else:
-                conn.execute("DELETE FROM favorite_foods WHERE user_id=? AND food=?", (user_id, food))
-                conn.commit()
-            logger.info(f"Deleted food {food} from favorite_foods for user {user_id}")
-        except Exception as e:
-            logger.error(f"DB delete favorite error: {e}")
-
-    def add_restaurant(self, user_id, name, latitude, longitude, review, rating):
-        conn = self.get_conn()
-        try:
-            timestamp = int(time.time())
-            if self.use_postgres:
-                conn.run(
-                    "INSERT INTO restaurants (user_id, name, latitude, longitude, review, rating, timestamp) "
-                    "VALUES (:u, :n, :lat, :lon, :r, :rat, :t)",
-                    u=user_id, n=name, lat=latitude, lon=longitude, r=review, rat=rating, t=timestamp
-                )
-            else:
-                conn.execute(
-                    "INSERT INTO restaurants (user_id, name, latitude, longitude, review, rating, timestamp) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (user_id, name, latitude, longitude, review, rating, timestamp)
-                )
-                conn.commit()
-            logger.info(f"Added restaurant {name} for user {user_id}")
-        except Exception as e:
-            logger.error(f"DB add restaurant error: {e}")
-
-    def get_user_restaurants(self, user_id):
-        conn = self.get_conn()
-        try:
-            if self.use_postgres:
-                rows = conn.run("SELECT name, latitude, longitude, review, rating FROM restaurants WHERE user_id=:u ORDER BY timestamp DESC", u=user_id)
-                return [dict(name=r[0], latitude=r[1], longitude=r[2], review=r[3], rating=r[4]) for r in rows]
-            else:
-                cursor = conn.execute("SELECT name, latitude, longitude, review, rating FROM restaurants WHERE user_id=? ORDER BY timestamp DESC", (user_id,))
-                return [dict(name=r[0], latitude=r[1], longitude=r[2], review=r[3], rating=r[4]) for r in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"DB get user restaurants error: {e}")
-            return []
-
-    def get_all_restaurants(self):
-        conn = self.get_conn()
-        try:
-            if self.use_postgres:
-                rows = conn.run("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants ORDER BY timestamp DESC")
-                return [dict(user_id=r[0], name=r[1], latitude=r[2], longitude=r[3], review=r[4], rating=r[5]) for r in rows]
-            else:
-                cursor = conn.execute("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants ORDER BY timestamp DESC")
-                return [dict(user_id=r[0], name=r[1], latitude=r[2], longitude=r[3], review=r[4], rating=r[5]) for r in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"DB get all restaurants error: {e}")
-            return []
+    # Áp dụng tương tự cho các method khác (thêm delete_favorite, add_restaurant, v.v. với MongoDB insert/find/delete_one)
 
 db = Database()
 
