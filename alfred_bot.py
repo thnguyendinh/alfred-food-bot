@@ -234,10 +234,10 @@ class Database:
         conn = self.get_conn()
         try:
             if self.use_postgres:
-                rows = conn.run("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants")
+                rows = conn.run("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants ORDER BY timestamp DESC")
                 return [dict(user_id=r[0], name=r[1], latitude=r[2], longitude=r[3], review=r[4], rating=r[5]) for r in rows]
             else:
-                cursor = conn.execute("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants")
+                cursor = conn.execute("SELECT user_id, name, latitude, longitude, review, rating FROM restaurants ORDER BY timestamp DESC")
                 return [dict(user_id=r[0], name=r[1], latitude=r[2], longitude=r[3], review=r[4], rating=r[5]) for r in cursor.fetchall()]
         except Exception as e:
             logger.error(f"DB get all restaurants error: {e}")
@@ -255,26 +255,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🎯 START HANDLER for user {user_id} in chat {chat_id}")
     try:
         response = (
-            "Xin chào! Tôi là quản gia Alfred Vị Việt. Tôi sẽ giúp bạn có bữa ăn ngon!\n"
-            "- /suggest [khô/nước]: Gợi ý món ăn ngẫu nhiên, theo loại.\n"
-            "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
-            "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
-            "- /location [tên vùng]: Gợi ý món theo vùng hoặc chia sẻ vị trí GPS.\n"
+            "Xin chào! Tôi là quản gia *Alfred Vị Việt* 🇻🇳\n"
+            "Tôi sẽ giúp bạn khám phá món ăn ngon và quán ăn tuyệt vời!\n\n"
+            "📖 *Danh sách lệnh:*\n"
+            "- /suggest [khô/nước]: Gợi ý món ăn ngẫu nhiên.\n"
+            "- /region [tên vùng]: Gợi ý món theo vùng (VD: Hà Nội).\n"
+            "- /ingredient [nguyên liệu]: Tìm món từ nguyên liệu (VD: thịt bò).\n"
+            "- /location: Gợi ý món theo vị trí GPS.\n"
+            "- /holiday [dịp lễ]: Gợi ý món theo dịp (VD: Tết Nguyên Đán).\n"
             "- /save [món]: Lưu món yêu thích.\n"
-            "- /favorites [món]: Xem món yêu thích.\n"
-            "- /restaurant [món]: Tổng hợp quán ăn.\n"
-            "- /myrestaurants: Xem danh sách quán ăn đã lưu.\n"
+            "- /favorites: Xem món yêu thích.\n"
+            "- /restaurant: Xem quán ăn bạn và người khác đã lưu.\n"
+            "- /myrestaurants: Xem quán ăn bạn đã lưu.\n"
             "- /donate: Ủng hộ bot.\n"
-            "- Gửi tên món: Tra thông tin chi tiết (hỗ trợ không dấu, ví dụ: 'pho')."
+            "- Gửi tên món: Tra chi tiết món (hỗ trợ không dấu, VD: pho)."
         )
         keyboard = [
+            [InlineKeyboardButton("Gợi ý món ngay! 🍲", callback_data="suggest")],
             [InlineKeyboardButton("Ủng hộ bot ❤️", url="https://viettelmoney.go.link/fuCfu")],
-            #[InlineKeyboardButton("Donate qua Viettel money", url="https://viettelmoney.go.link/fuCfu")],
-            [InlineKeyboardButton("Gợi ý món ngay!", callback_data="suggest")]
+            #[InlineKeyboardButton("Donate qua Viettel Money", url="https://viettelmoney.go.link/fuCfu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         sent_message = await asyncio.wait_for(
-            context.bot.send_message(chat_id=chat_id, text=response, reply_markup=reply_markup, parse_mode="Markdown"),
+            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
             timeout=30.0
         )
         logger.info(f"✅ Sent /start response to user {user_id}: message_id={sent_message.message_id}")
@@ -314,7 +317,7 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             food_info = VIETNAMESE_FOODS[food]
             db.add_eaten(user_id, food)
             response = (
-                f"Đề xuất món: *{food}*\n"
+                f"🍲 *Đề xuất món: {food}*\n"
                 f"- Loại: {food_info['type']}\n"
                 f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
                 f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
@@ -322,9 +325,9 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Calo ước tính: {food_info['calories']}"
             )
             keyboard = [
-                [InlineKeyboardButton("Xem cách làm", callback_data=f"recipe_{food}")],
-                [InlineKeyboardButton("Lưu món này", callback_data=f"save_{food}")],
-                [InlineKeyboardButton("Gợi ý món khác", callback_data="suggest")]
+                [InlineKeyboardButton("📖 Xem cách làm", callback_data=f"recipe_{food}")],
+                [InlineKeyboardButton("💾 Lưu món này", callback_data=f"save_{food}")],
+                [InlineKeyboardButton("🔄 Gợi ý món khác", callback_data="suggest")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             sent_message = await asyncio.wait_for(
@@ -333,9 +336,9 @@ async def suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.info(f"✅ Sent suggest response to user {user_id}: {food}, message_id={sent_message.message_id}")
         else:
-            response = "Không còn món mới để gợi ý! Thử /favorites hoặc gửi tên món để xem chi tiết."
+            response = "😔 Không còn món mới để gợi ý! Thử /favorites hoặc gửi tên món để xem chi tiết."
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent no foods response to user {user_id}: message_id={sent_message.message_id}")
@@ -360,11 +363,11 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 region = normalized_regions[best_match]
                 foods = REGIONAL_FOODS.get(region, [])
                 if foods:
-                    response = f"Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
+                    response = f"🌏 Món ăn phổ biến tại *{region}*: {', '.join(foods)}"
                     keyboard = [[InlineKeyboardButton(food, callback_data=f"recipe_{food}")] for food in foods[:5]]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                 else:
-                    response = f"Không tìm thấy món ăn cho vùng *{region}*."
+                    response = f"😔 Không tìm thấy món ăn cho vùng *{region}*."
                     reply_markup = None
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
@@ -372,16 +375,16 @@ async def region_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent region response to user {user_id}: {region}, message_id={sent_message.message_id}")
             else:
-                response = f"Không tìm thấy vùng '{ ' '.join(context.args) }'. Thử 'Hà Nội', 'Sài Gòn', 'Huế' (hỗ trợ không dấu)."
+                response = f"😔 Không tìm thấy vùng '{ ' '.join(context.args) }'. Thử 'Hà Nội', 'Sài Gòn', 'Huế' (hỗ trợ không dấu)."
                 sent_message = await asyncio.wait_for(
-                    context.bot.send_message(chat_id=chat_id, text=response),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent region not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /region [tên vùng], ví dụ: /region Hà Nội hoặc ha noi"
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent region usage response to user {user_id}: message_id={sent_message.message_id}")
@@ -398,7 +401,6 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
     logger.info(f"🎯 INGREDIENT HANDLER for user {user_id} with args: {context.args}")
     try:
         if context.args:
-            # Fix: Treat space-separated as single phrase if no comma
             raw_input = ' '.join(context.args)
             if ',' in raw_input:
                 raw_ingredients = raw_input.split(',')
@@ -411,12 +413,12 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 if all(ing in food_ingredients_str for ing in ingredients):
                     matching_foods.append(food)
             if matching_foods:
-                display_ingredients = raw_input  # Display as entered
-                response = f"Món ăn với nguyên liệu {display_ingredients}: {', '.join(matching_foods)}"
+                display_ingredients = raw_input
+                response = f"🥗 Món ăn với nguyên liệu *{display_ingredients}*: {', '.join(matching_foods)}"
                 keyboard = [[InlineKeyboardButton(food, callback_data=f"recipe_{food}")] for food in matching_foods[:5]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
             else:
-                response = f"Không tìm thấy món ăn với nguyên liệu: {raw_input}."
+                response = f"😔 Không tìm thấy món ăn với nguyên liệu: *{raw_input}*."
                 reply_markup = None
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
@@ -424,9 +426,9 @@ async def ingredient_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             logger.info(f"✅ Sent ingredient response to user {user_id}: message_id={sent_message.message_id}")
         else:
-            response = "Sử dụng: /ingredient [nguyên liệu1, nguyên liệu2], ví dụ: /ingredient thịt bò, rau thơm hoặc thit bo, rau thom"
+            response = "Sử dụng: /ingredient [nguyên liệu], ví dụ: /ingredient thịt bò, rau thơm hoặc thit bo"
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent ingredient usage response to user {user_id}: message_id={sent_message.message_id}")
@@ -442,9 +444,9 @@ async def location_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     logger.info(f"🎯 LOCATION HANDLER for user {user_id} with args: {context.args}")
     try:
-        response = "Vui lòng chia sẻ vị trí GPS bằng nút 'Location' hoặc gửi tọa độ (VD: 10.7769,106.7009)."
+        response = "📍 Vui lòng chia sẻ vị trí GPS bằng nút 'Location' hoặc gửi tọa độ (VD: 10.7769,106.7009)."
         sent_message = await asyncio.wait_for(
-            context.bot.send_message(chat_id=chat_id, text=response),
+            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
             timeout=30.0
         )
         logger.info(f"✅ Sent location prompt response to user {user_id}: message_id={sent_message.message_id}")
@@ -468,23 +470,23 @@ async def save(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if distance <= 3:
                 food = normalized_foods[best_match]
                 db.add_favorite(user_id, food)
-                response = f"Đã lưu *{food}* vào danh sách yêu thích!"
+                response = f"💾 Đã lưu *{food}* vào danh sách yêu thích!"
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent save response to user {user_id}: {food}, message_id={sent_message.message_id}")
             else:
-                response = f"Món '{ ' '.join(context.args) }' không tìm thấy. Thử /suggest hoặc gửi tên món khác (hỗ trợ không dấu)."
+                response = f"😔 Món '{ ' '.join(context.args) }' không tìm thấy. Thử /suggest hoặc gửi tên món khác (hỗ trợ không dấu)."
                 sent_message = await asyncio.wait_for(
-                    context.bot.send_message(chat_id=chat_id, text=response),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent save not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /save [tên món], ví dụ: /save Phở hoặc pho"
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent save usage response to user {user_id}: message_id={sent_message.message_id}")
@@ -502,16 +504,16 @@ async def favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         favorite_foods = db.get_favorites(user_id)
         if favorite_foods:
-            response = "Món ăn yêu thích của bạn:\n" + "\n".join(f"- {food}" for food in favorite_foods)
+            response = "❤️ Món ăn yêu thích của bạn:\n" + "\n".join(f"- {food}" for food in favorite_foods)
             keyboard = []
             for food in favorite_foods:
                 keyboard.append([
-                    InlineKeyboardButton(food, callback_data=f"recipe_{food}"),
-                    InlineKeyboardButton(f"Xoá {food}", callback_data=f"delete_favorite_{food}")
+                    InlineKeyboardButton(f"📖 {food}", callback_data=f"recipe_{food}"),
+                    InlineKeyboardButton(f"🗑 Xoá", callback_data=f"delete_favorite_{food}")
                 ])
             reply_markup = InlineKeyboardMarkup(keyboard)
         else:
-            response = "Bạn chưa có món ăn yêu thích nào. Thử /save [tên món] để lưu!"
+            response = "😔 Bạn chưa có món ăn yêu thích nào. Thử /save [tên món] để lưu!"
             reply_markup = None
         sent_message = await asyncio.wait_for(
             context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
@@ -531,17 +533,17 @@ async def donate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🎯 DONATE HANDLER for user {user_id}")
     try:
         response = (
-            "Cảm ơn bạn đã sử dụng Alfred Vị Việt! ❤️\n"
+            "❤️ Cảm ơn bạn đã sử dụng *Alfred Vị Việt*! \n"
             "Nếu bạn thấy bot hữu ích, hãy ủng hộ mình để duy trì và phát triển nhé!\n"
-            "Nhấn nút dưới để donate."
+            "Chọn phương thức donate bên dưới:"
         )
         keyboard = [
-            #[InlineKeyboardButton("Donate qua PayPal", url="https://paypal.me/alfredfoodbot")],
-            [InlineKeyboardButton("Donate qua Viettel money", url="https://viettelmoney.go.link/fuCfu")]
+            #[InlineKeyboardButton("💸 PayPal", url="https://paypal.me/alfredfoodbot")],
+            [InlineKeyboardButton("💳 Viettel Money", url="https://viettelmoney.go.link/fuCfu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         sent_message = await asyncio.wait_for(
-            context.bot.send_message(chat_id=chat_id, text=response, reply_markup=reply_markup, parse_mode="Markdown"),
+            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
             timeout=30.0
         )
         logger.info(f"✅ Sent donate response to user {user_id}: message_id={sent_message.message_id}")
@@ -566,12 +568,12 @@ async def holiday_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 holiday = normalized_holidays[best_match]
                 matching_foods = [food for food, info in VIETNAMESE_FOODS.items() if holiday in info['holidays']]
                 if matching_foods:
-                    response = f"Món ăn phù hợp cho *{holiday}*: {', '.join(matching_foods)}"
+                    response = f"🎉 Món ăn phù hợp cho *{holiday}*: {', '.join(matching_foods)}"
                     keyboard = [[InlineKeyboardButton(food, callback_data=f"recipe_{food}")] for food in matching_foods[:5]]
-                    keyboard.append([InlineKeyboardButton("Gợi ý món khác", callback_data="suggest")])
+                    keyboard.append([InlineKeyboardButton("🔄 Gợi ý món khác", callback_data="suggest")])
                     reply_markup = InlineKeyboardMarkup(keyboard)
                 else:
-                    response = f"Không có món ăn nào đặc trưng cho *{holiday}*."
+                    response = f"😔 Không có món ăn nào đặc trưng cho *{holiday}*."
                     reply_markup = None
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", reply_markup=reply_markup),
@@ -579,16 +581,16 @@ async def holiday_suggest(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent holiday response to user {user_id}: {holiday}, message_id={sent_message.message_id}")
             else:
-                response = f"Không tìm thấy ngày lễ '{ ' '.join(context.args) }'. Thử 'Tết Nguyên Đán', 'Trung Thu' (hỗ trợ không dấu)."
+                response = f"😔 Không tìm thấy ngày lễ '{ ' '.join(context.args) }'. Thử 'Tết Nguyên Đán', 'Trung Thu' (hỗ trợ không dấu)."
                 sent_message = await asyncio.wait_for(
-                    context.bot.send_message(chat_id=chat_id, text=response),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent holiday not found response to user {user_id}: message_id={sent_message.message_id}")
         else:
             response = "Sử dụng: /holiday [tên ngày lễ], ví dụ: /holiday Tết Nguyên Đán hoặc tet nguyen dan"
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent holiday usage response to user {user_id}: message_id={sent_message.message_id}")
@@ -604,14 +606,41 @@ async def restaurant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     logger.info(f"🎯 RESTAURANT HANDLER for user {user_id}")
     try:
-        restaurants = db.get_user_restaurants(user_id)
-        if restaurants:
-            response = "Danh sách quán ăn bạn đã lưu:\n"
-            for r in restaurants:
+        # Lấy danh sách quán ăn của người dùng hiện tại
+        user_restaurants = db.get_user_restaurants(user_id)
+        # Lấy tất cả quán ăn từ database
+        all_restaurants = db.get_all_restaurants()
+        # Lọc danh sách quán ăn của người dùng khác
+        other_restaurants = [r for r in all_restaurants if r['user_id'] != user_id]
+
+        response = "🏪 *Danh sách quán ăn*\n\n"
+        
+        # Hiển thị quán ăn của người dùng
+        if user_restaurants:
+            response += "🍽 *Quán ăn bạn đã lưu:*\n"
+            for r in user_restaurants[:5]:  # Giới hạn 5 quán để tránh quá dài
                 map_link = f"https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}"
-                response += f"- *{r['name']}* ({r['rating']} sao): {r['review']}\n  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ]({map_link}))\n"
+                response += (
+                    f"- *{r['name']}* ({r['rating']} ⭐)\n"
+                    f"  Đánh giá: {r['review']}\n"
+                    f"  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ]({map_link}))\n"
+                )
         else:
-            response = "Bạn chưa lưu quán ăn nào. Gửi vị trí GPS và chọn 'Lưu quán ăn' để bắt đầu!"
+            response += "😔 Bạn chưa lưu quán ăn nào. Gửi vị trí GPS và chọn 'Lưu quán ăn' để bắt đầu!\n"
+
+        # Hiển thị quán ăn của người dùng khác
+        if other_restaurants:
+            response += "\n🌐 *Quán ăn từ người dùng khác:*\n"
+            for r in other_restaurants[:5]:  # Giới hạn 5 quán để tránh quá dài
+                map_link = f"https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}"
+                response += (
+                    f"- *{r['name']}* ({r['rating']} ⭐)\n"
+                    f"  Đánh giá: {r['review']}\n"
+                    f"  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ]({map_link}))\n"
+                )
+        else:
+            response += "\n🌐 *Quán ăn từ người dùng khác:* Chưa có quán nào được lưu bởi người khác."
+
         sent_message = await asyncio.wait_for(
             context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", disable_web_page_preview=True),
             timeout=30.0
@@ -625,7 +654,33 @@ async def restaurant(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ Failed to send restaurant response to user {user_id}: {e}")
 
 async def my_restaurants(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await restaurant(update, context)  # Reuse /restaurant handler
+    user_id = str(update.effective_user.id)
+    chat_id = update.effective_chat.id
+    logger.info(f"🎯 MY_RESTAURANTS HANDLER for user {user_id}")
+    try:
+        restaurants = db.get_user_restaurants(user_id)
+        if restaurants:
+            response = "🍽 *Quán ăn bạn đã lưu:*\n"
+            for r in restaurants[:5]:
+                map_link = f"https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}"
+                response += (
+                    f"- *{r['name']}* ({r['rating']} ⭐)\n"
+                    f"  Đánh giá: {r['review']}\n"
+                    f"  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ]({map_link}))\n"
+                )
+        else:
+            response = "😔 Bạn chưa lưu quán ăn nào. Gửi vị trí GPS và chọn 'Lưu quán ăn' để bắt đầu!"
+        sent_message = await asyncio.wait_for(
+            context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown", disable_web_page_preview=True),
+            timeout=30.0
+        )
+        logger.info(f"✅ Sent myrestaurants response to user {user_id}: message_id={sent_message.message_id}")
+    except asyncio.TimeoutError:
+        logger.error(f"❌ TIMEOUT in /myrestaurants for user {user_id}")
+    except TelegramError as te:
+        logger.error(f"❌ Telegram error in /myrestaurants for user {user_id}: {te.message} (code={getattr(te, 'status_code', 'unknown')})")
+    except Exception as e:
+        logger.error(f"❌ Failed to send myrestaurants response to user {user_id}: {e}")
 
 async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
@@ -638,11 +693,11 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['location'] = (latitude, longitude)
             region = get_region_from_coordinates(latitude, longitude)
             foods = REGIONAL_FOODS.get(region, REGIONAL_FOODS.get("Sài Gòn", []))
-            response = f"Dựa trên vị trí ({latitude:.4f}, {longitude:.4f}), vùng gần: *{region}*. Món gợi ý: {', '.join(foods[:5])}" if foods else f"Vùng: *{region}*. Không tìm thấy món."
+            response = f"📍 Vị trí ({latitude:.4f}, {longitude:.4f}), vùng gần: *{region}*.\nMón gợi ý: {', '.join(foods[:5])}" if foods else f"📍 Vùng: *{region}*. Không tìm thấy món."
             keyboard = [
-                [InlineKeyboardButton("Giới thiệu món", callback_data="suggest")],
-                [InlineKeyboardButton("Lưu quán ăn", callback_data="start_save_restaurant")],
-                [InlineKeyboardButton("Xem quán gần", callback_data="nearby_restaurants")]
+                [InlineKeyboardButton("🍲 Giới thiệu món", callback_data="suggest")],
+                [InlineKeyboardButton("💾 Lưu quán ăn", callback_data="start_save_restaurant")],
+                [InlineKeyboardButton("🏪 Xem quán gần", callback_data="nearby_restaurants")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             sent_message = await asyncio.wait_for(
@@ -651,9 +706,9 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.info(f"✅ Sent location response to user {user_id}: {region}, message_id={sent_message.message_id}")
         else:
-            response = "Vui lòng chia sẻ vị trí GPS bằng nút 'Location'."
+            response = "📍 Vui lòng chia sẻ vị trí GPS bằng nút 'Location'."
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent location request response to user {user_id}: message_id={sent_message.message_id}")
@@ -668,19 +723,19 @@ async def start_save_restaurant(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     if 'location' not in context.user_data:
-        await query.edit_message_text("Gửi vị trí GPS trước để lưu quán.")
+        await query.edit_message_text("📍 Gửi vị trí GPS trước để lưu quán.")
         return ConversationHandler.END
-    await query.edit_message_text("Nhập tên quán ăn:")
+    await query.edit_message_text("🏪 Nhập tên quán ăn:")
     return NAME
 
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['restaurant_name'] = update.message.text
-    await update.message.reply_text("Nhập đánh giá về quán ăn:")
+    await update.message.reply_text("📝 Nhập đánh giá về quán ăn:")
     return REVIEW
 
 async def get_review(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['restaurant_review'] = update.message.text
-    await update.message.reply_text("Nhập số sao (1-5):")
+    await update.message.reply_text("⭐ Nhập số sao (1-5):")
     return RATING
 
 async def get_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -692,18 +747,18 @@ async def get_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
             review = context.user_data['restaurant_review']
             latitude, longitude = context.user_data['location']
             db.add_restaurant(user_id, name, latitude, longitude, review, rating)
-            await update.message.reply_text(f"Đã lưu quán *{name}* với đánh giá {rating} sao!", parse_mode="Markdown")
+            await update.message.reply_text(f"✅ Đã lưu quán *{name}* với đánh giá {rating} sao!", parse_mode="Markdown")
             context.user_data.clear()
             return ConversationHandler.END
         else:
-            await update.message.reply_text("Số sao phải từ 1 đến 5. Vui lòng nhập lại.")
+            await update.message.reply_text("⭐ Số sao phải từ 1 đến 5. Vui lòng nhập lại.")
             return RATING
     except ValueError:
-        await update.message.reply_text("Vui lòng nhập số từ 1 đến 5.")
+        await update.message.reply_text("🔢 Vui lòng nhập số từ 1 đến 5.")
         return RATING
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hủy lưu quán ăn.")
+    await update.message.reply_text("❌ Hủy lưu quán ăn.")
     context.user_data.clear()
     return ConversationHandler.END
 
@@ -721,7 +776,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             food = normalized_foods[best_match]
             food_info = VIETNAMESE_FOODS[food]
             response = (
-                f"*{food}* là món ăn nổi tiếng!\n"
+                f"🍲 *{food}* là món ăn nổi tiếng!\n"
                 f"- Loại: {food_info['type']}\n"
                 f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
                 f"- Cách làm: {food_info['recipe']}\n"
@@ -730,7 +785,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"- Calo ước tính: {food_info['calories']}"
             )
             keyboard = [
-                [InlineKeyboardButton("Lưu món này", callback_data=f"save_{food}")]
+                [InlineKeyboardButton("💾 Lưu món này", callback_data=f"save_{food}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             sent_message = await asyncio.wait_for(
@@ -739,9 +794,9 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             logger.info(f"✅ Sent echo response to user {user_id}: {food}, message_id={sent_message.message_id}")
         else:
-            response = f"Món '{text}' chưa có trong danh sách. Thử /suggest để gợi ý mới! (Hỗ trợ không dấu, ví dụ: 'pho')"
+            response = f"😔 Món '{text}' chưa có trong danh sách. Thử /suggest để gợi ý mới! (Hỗ trợ không dấu, ví dụ: 'pho')"
             sent_message = await asyncio.wait_for(
-                context.bot.send_message(chat_id=chat_id, text=response),
+                context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent echo not found response to user {user_id}: message_id={sent_message.message_id}")
@@ -764,7 +819,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             food = data.replace("recipe_", "")
             if food in VIETNAMESE_FOODS:
                 food_info = VIETNAMESE_FOODS[food]
-                response = f"Cách làm *{food}*: {food_info['recipe']}"
+                response = f"📖 Cách làm *{food}*: {food_info['recipe']}"
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
@@ -774,7 +829,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             food = data.replace("save_", "")
             if food in VIETNAMESE_FOODS:
                 db.add_favorite(user_id, food)
-                response = f"Đã lưu *{food}* vào danh sách yêu thích!"
+                response = f"💾 Đã lưu *{food}* vào danh sách yêu thích!"
                 sent_message = await asyncio.wait_for(
                     context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
@@ -783,14 +838,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data.startswith("delete_favorite_"):
             food = data.replace("delete_favorite_", "")
             db.delete_favorite(user_id, food)
-            response = f"Đã xoá *{food}* khỏi danh sách yêu thích!"
+            response = f"🗑 Đã xoá *{food}* khỏi danh sách yêu thích!"
             sent_message = await asyncio.wait_for(
                 context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                 timeout=30.0
             )
             logger.info(f"✅ Sent delete favorite response to user {user_id}: {food}, message_id={sent_message.message_id}")
-            # Cập nhật lại danh sách favorites
-            await favorites(update, context)  # Gọi lại /favorites để refresh danh sách
+            await favorites(update, context)
         elif data == "suggest":
             eaten_foods = db.get_eaten(user_id)
             available_foods = [food for food in VIETNAMESE_FOODS.keys() if food not in eaten_foods]
@@ -799,7 +853,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 food_info = VIETNAMESE_FOODS[food]
                 db.add_eaten(user_id, food)
                 response = (
-                    f"Đề xuất món: *{food}*\n"
+                    f"🍲 Đề xuất món: *{food}*\n"
                     f"- Loại: {food_info['type']}\n"
                     f"- Nguyên liệu: {', '.join(food_info['ingredients'])}\n"
                     f"- Phổ biến tại: {', '.join(food_info['popular_regions'])}\n"
@@ -807,9 +861,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"- Calo ước tính: {food_info['calories']}"
                 )
                 keyboard = [
-                    [InlineKeyboardButton("Xem cách làm", callback_data=f"recipe_{food}")],
-                    [InlineKeyboardButton("Lưu món này", callback_data=f"save_{food}")],
-                    [InlineKeyboardButton("Gợi ý món khác", callback_data="suggest")]
+                    [InlineKeyboardButton("📖 Xem cách làm", callback_data=f"recipe_{food}")],
+                    [InlineKeyboardButton("💾 Lưu món này", callback_data=f"save_{food}")],
+                    [InlineKeyboardButton("🔄 Gợi ý món khác", callback_data="suggest")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 sent_message = await asyncio.wait_for(
@@ -818,9 +872,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 logger.info(f"✅ Sent button suggest response to user {user_id}: {food}, message_id={sent_message.message_id}")
             else:
-                response = "Không còn món mới để gợi ý! Thử /favorites hoặc gửi tên món."
+                response = "😔 Không còn món mới để gợi ý! Thử /favorites hoặc gửi tên món."
                 sent_message = await asyncio.wait_for(
-                    context.bot.send_message(chat_id=chat_id, text=response),
+                    context.bot.send_message(chat_id=chat_id, text=response, parse_mode="Markdown"),
                     timeout=30.0
                 )
                 logger.info(f"✅ Sent no foods response to user {user_id}: message_id={sent_message.message_id}")
@@ -837,15 +891,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         nearby.append((r, dist))
                 nearby.sort(key=lambda x: x[1])
                 if nearby:
-                    response = "Quán gần (<1km):\n" + "\n".join(
-                        f"- *{r['name']}* ({round(dist, 2)}km, {r['rating']} sao): {r['review']}\n  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ](https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}))"
+                    response = "🏪 Quán gần (<1km):\n" + "\n".join(
+                        f"- *{r['name']}* ({round(dist, 2)}km, {r['rating']} ⭐)\n"
+                        f"  Đánh giá: {r['review']}\n"
+                        f"  Vị trí: **{r['latitude']:.4f}, {r['longitude']:.4f}** ([Bản đồ](https://www.google.com/maps/search/?api=1&query={r['latitude']},{r['longitude']}))"
                         for r, dist in nearby[:5]
                     )
                 else:
-                    response = "Không có quán nào trong 1km."
+                    response = "😔 Không có quán nào trong 1km."
                 await query.edit_message_text(response, parse_mode="Markdown", disable_web_page_preview=True)
             else:
-                await query.edit_message_text("Gửi vị trí GPS trước.")
+                await query.edit_message_text("📍 Gửi vị trí GPS trước.")
     except asyncio.TimeoutError:
         logger.error(f"❌ TIMEOUT in button_callback for user {user_id}")
     except TelegramError as te:
@@ -862,7 +918,7 @@ conv_handler = ConversationHandler(
         RATING: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_rating)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
-    per_message=False  # Sửa PTBUserWarning
+    per_message=False
 )
 
 # Build Application
@@ -929,7 +985,7 @@ def index():
 if __name__ == "__main__":
     if not TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN is not set")
-        raise ValueValue("TELEGRAM_BOT_TOKEN is not set")
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set")
     
     if not WEBHOOK_URL:
         logger.error("WEBHOOK_URL is not set")
