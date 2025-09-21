@@ -197,7 +197,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🎯 START HANDLER for user {user_id} in chat {chat_id}")
     try:
         response = (
-            "Xin chào! Mình là Alfred Vị Việt.\n"
+            "Xin chào! Tôi là quản gia Alfred Vị Việt. Tôi sẽ giúp bạn có bữa ăn ngon!\n"
             "- /suggest [khô/nước]: Gợi ý món ăn ngẫu nhiên, theo loại.\n"
             "- /region [tên vùng]: Gợi ý món theo vùng (ví dụ: /region Hà Nội).\n"
             "- /ingredient [nguyên liệu1, nguyên liệu2]: Gợi ý món từ nguyên liệu.\n"
@@ -551,7 +551,7 @@ async def donate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = (
             "Cảm ơn bạn đã sử dụng Alfred Vị Việt! ❤️\n"
             "Nếu bạn thấy bot hữu ích, hãy ủng hộ mình để duy trì và phát triển nhé!\n"
-            "Nhấn nút dưới để donate qua PayPal hoặc Momo."
+            "Nhấn nút dưới để donate."
         )
         keyboard = [
             #[InlineKeyboardButton("Donate qua PayPal", url="https://paypal.me/alfredfoodbot")],
