@@ -350,7 +350,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         keyboard = [
             [InlineKeyboardButton("Gợi ý món ngay! 🍲", callback_data="suggest")],
-            [InlineKeyboardButton("Ủng hộ bot ❤️", url="https://viettelmoney.go.link/fuCfu")],
+            #[InlineKeyboardButton("Ủng hộ bot ❤️", url="https://viettelmoney.go.link/fuCfu")],
             #[InlineKeyboardButton("Donate qua Viettel Money", url="https://viettelmoney.go.link/fuCfu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
