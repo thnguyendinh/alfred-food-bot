@@ -5,3 +5,4 @@ pg8000==1.30.3
 httpx==0.25.2
 lunarcalendar==0.0.9
 geopy==2.4.1
+pymongo==4.6.3
