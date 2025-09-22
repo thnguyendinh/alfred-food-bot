@@ -156,11 +156,10 @@ Nhấn nút inline để tương tác.
 Báo lỗi: Mở issue trên GitHub.
 Thêm món/vùng: Sửa foods_data.py, tạo pull request.
 Cải tiến: Đề xuất tính năng qua issue hoặc pull request.
-Donate: Gửi qua PayPal (https://paypal.me/your_link) hoặc Momo (https://me.momo.vn/your_id).
+Donate để giúp duy trì bot nếu bot hữu ích với bạn!
 
 Giấy phép
 MIT License. Xem LICENSE để biết thêm chi tiết.
 Liên hệ
 
-Telegram: @YourTelegram
-Email: your_email@example.com
+Telegram: @thnguyendinh

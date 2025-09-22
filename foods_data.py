@@ -468,6 +468,303 @@ VIETNAMESE_FOODS = {
         "holidays": ["Ngày thường"],
         "calories": "300-400 kcal",
         "meal_time": ["sáng", "trưa"]
+    },
+    "Bánh bao": {
+        "type": "khô",
+        "ingredients": ["bột mì", "thịt heo", "trứng cút", "nấm mèo", "hành tây", "gia vị"],
+        "recipe": "Nhồi bột mì ủ men, bọc nhân thịt heo xay với nấm mèo, trứng cút, hấp chín.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Hải Phòng", "Đà Nẵng"],
+        "holidays": ["Ngày thường"],
+        "calories": "250-350 kcal",
+        "meal_time": ["sáng", "xế"]
+    },
+    "Bánh bò": {
+        "type": "khô",
+        "ingredients": ["bột gạo", "nước cốt dừa", "đường", "men", "lá dứa"],
+        "recipe": "Trộn bột gạo với nước cốt dừa, đường và men, ủ lên men, hấp chín.",
+        "popular_regions": ["Miền Tây", "Sài Gòn", "Cần Thơ"],
+        "holidays": ["Ngày thường"],
+        "calories": "200-300 kcal",
+        "meal_time": ["sáng", "tráng miệng"]
+    },
+    "Bánh đúc nóng": {
+        "type": "khô",
+        "ingredients": ["bột gạo", "thịt băm", "mộc nhĩ", "hành phi", "nước mắm"],
+        "recipe": "Nấu bột gạo thành cháo đặc, rắc thịt băm xào mộc nhĩ, hành phi, chấm nước mắm.",
+        "popular_regions": ["Hà Nội", "Bắc Ninh", "Hải Dương"],
+        "holidays": ["Ngày thường"],
+        "calories": "300-400 kcal",
+        "meal_time": ["sáng", "trưa"]
+    },
+    "Bánh khọt": {
+        "type": "khô",
+        "ingredients": ["bột gạo", "nước cốt dừa", "tôm", "dầu ăn", "nước mắm"],
+        "recipe": "Đổ bột vào khuôn nhỏ, thêm tôm, chiên giòn, ăn kèm rau sống và nước mắm.",
+        "popular_regions": ["Vũng Tàu", "Bà Rịa", "Sài Gòn"],
+        "holidays": ["Ngày thường"],
+        "calories": "350-450 kcal",
+        "meal_time": ["sáng", "trưa"]
+    },
+    "Bánh mì chảo": {
+        "type": "khô",
+        "ingredients": ["bánh mì", "trứng", "chả lụa", "pate", "xúc xích", "nước tương"],
+        "recipe": "Chiên trứng, chả lụa, xúc xích ăn kèm bánh mì và pate.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Đà Lạt"],
+        "holidays": ["Ngày thường"],
+        "calories": "600-700 kcal",
+        "meal_time": ["sáng", "tối"]
+    },
+    "Bánh tằm bì": {
+        "type": "khô",
+        "ingredients": ["bánh tằm", "bì heo", "nước cốt dừa", "nước mắm", "đậu phộng"],
+        "recipe": "Trộn bánh tằm với bì heo, nước cốt dừa, nước mắm và đậu phộng.",
+        "popular_regions": ["Sóc Trăng", "Cần Thơ", "Bạc Liêu"],
+        "holidays": ["Ngày thường"],
+        "calories": "450-550 kcal",
+        "meal_time": ["sáng", "trưa"]
+    },
+    "Bò lá lốt": {
+        "type": "khô",
+        "ingredients": ["thịt bò", "lá lốt", "gia vị", "bún", "nước mắm"],
+        "recipe": "Bọc thịt bò xay trong lá lốt, nướng hoặc chiên, ăn kèm bún và nước mắm.",
+        "popular_regions": ["Sài Gòn", "Miền Đông", "Đồng Nai"],
+        "holidays": ["Ngày thường"],
+        "calories": "400-500 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Bò nướng ngói": {
+        "type": "khô",
+        "ingredients": ["thịt bò", "sả", "tỏi", "mật ong", "dầu hào", "rau sống"],
+        "recipe": "Ướp thịt bò với sả, tỏi, mật ong, nướng trên ngói, ăn kèm rau sống.",
+        "popular_regions": ["Đà Lạt", "Sài Gòn", "Nha Trang"],
+        "holidays": ["Ngày thường"],
+        "calories": "500-600 kcal",
+        "meal_time": ["tối"]
+    },
+    "Bún mắm": {
+        "type": "nước",
+        "ingredients": ["bún", "mắm cá", "tôm", "thịt heo", "cà tím", "rau sống"],
+        "recipe": "Nấu nước dùng từ mắm cá, thêm tôm, thịt, cà tím, ăn kèm bún và rau.",
+        "popular_regions": ["Miền Tây", "Sóc Trăng", "Cần Thơ"],
+        "holidays": ["Ngày thường"],
+        "calories": "550-650 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Bún thịt nướng": {
+        "type": "khô",
+        "ingredients": ["bún", "thịt heo nướng", "rau sống", "nước mắm", "đậu phộng"],
+        "recipe": "Xếp bún, thịt nướng, rau sống, rắc đậu phộng, chan nước mắm.",
+        "popular_regions": ["Sài Gòn", "Miền Tây", "Đà Lạt"],
+        "holidays": ["Ngày thường"],
+        "calories": "500-600 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Cá kho tộ": {
+        "type": "khô",
+        "ingredients": ["cá", "nước dừa", "nước mắm", "đường", "tiêu", "ớt"],
+        "recipe": "Kho cá với nước dừa, nước mắm, đường trong nồi đất.",
+        "popular_regions": ["Miền Tây", "Sài Gòn", "Cần Thơ"],
+        "holidays": ["Tết Nguyên Đán", "Ngày thường"],
+        "calories": "400-500 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Cá lóc nướng trui": {
+        "type": "khô",
+        "ingredients": ["cá lóc", "muối", "ớt", "rau sống", "nước mắm"],
+        "recipe": "Nướng cá nguyên con trên than, ăn kèm rau sống và nước mắm.",
+        "popular_regions": ["Miền Tây", "Đồng Tháp", "An Giang"],
+        "holidays": ["Ngày thường"],
+        "calories": "350-450 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Cháo gà": {
+        "type": "nước",
+        "ingredients": ["gạo", "thịt gà", "hành lá", "rau răm", "gừng"],
+        "recipe": "Nấu cháo từ gạo và nước luộc gà, thêm thịt gà xé, hành lá, rau răm.",
+        "popular_regions": ["Toàn quốc"],
+        "holidays": ["Ngày thường"],
+        "calories": "400-500 kcal",
+        "meal_time": ["sáng", "tối"]
+    },
+    "Cháo sườn": {
+        "type": "nước",
+        "ingredients": ["gạo", "sườn heo", "hành lá", "quẩy", "gia vị"],
+        "recipe": "Nấu cháo với sườn heo, thêm hành lá, ăn kèm quẩy.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Đà Nẵng"],
+        "holidays": ["Ngày thường"],
+        "calories": "450-550 kcal",
+        "meal_time": ["sáng", "tối"]
+    },
+    "Chè hạt sen": {
+        "type": "nước",
+        "ingredients": ["hạt sen", "đường", "lá dứa", "nước cốt dừa"],
+        "recipe": "Nấu hạt sen với đường và lá dứa, thêm nước cốt dừa.",
+        "popular_regions": ["Huế", "Hà Nội", "Sài Gòn"],
+        "holidays": ["Ngày thường"],
+        "calories": "300-400 kcal",
+        "meal_time": ["tráng miệng"]
+    },
+    "Chè thái": {
+        "type": "nước",
+        "ingredients": ["trái cây thái hạt lựu", "thạch", "nước cốt dừa", "đường", "đá"],
+        "recipe": "Trộn các loại trái cây với thạch, nước cốt dừa, đường và đá.",
+        "popular_regions": ["Sài Gòn", "Miền Tây", "Hà Nội"],
+        "holidays": ["Ngày thường"],
+        "calories": "350-450 kcal",
+        "meal_time": ["tráng miệng"]
+    },
+    "Cốm": {
+        "type": "khô",
+        "ingredients": ["cốm non", "đường", "dừa nạo", "muối vừng"],
+        "recipe": "Ăn cốm non với chuối, hoặc trộn với đường, dừa nạo.",
+        "popular_regions": ["Hà Nội", "Vĩnh Phúc", "Bắc Ninh"],
+        "holidays": ["Mùa thu"],
+        "calories": "200-300 kcal",
+        "meal_time": ["sáng", "xế"]
+    },
+    "Cơm gà Hội An": {
+        "type": "khô",
+        "ingredients": ["gà", "gạo", "nước mắm", "rau răm", "tỏi"],
+        "recipe": "Nấu cơm với nước luộc gà, ăn kèm gà xé, rau răm, nước mắm tỏi.",
+        "popular_regions": ["Hội An", "Đà Nẵng", "Quảng Nam"],
+        "holidays": ["Ngày thường"],
+        "calories": "600-700 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Cơm niêu": {
+        "type": "khô",
+        "ingredients": ["gạo", "nước", "niêu đất", "thịt kho", "cá kho"],
+        "recipe": "Nấu cơm trong niêu đất, ăn kèm các món kho.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Huế"],
+        "holidays": ["Ngày thường"],
+        "calories": "500-600 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Cơm rang": {
+        "type": "khô",
+        "ingredients": ["cơm nguội", "trứng", "thịt", "rau củ", "nước tương"],
+        "recipe": "Rang cơm với trứng, thịt, rau củ và nước tương.",
+        "popular_regions": ["Toàn quốc"],
+        "holidays": ["Ngày thường"],
+        "calories": "500-600 kcal",
+        "meal_time": ["sáng", "trưa", "tối"]
+    },
+    "Gà nướng muối ớt": {
+        "type": "khô",
+        "ingredients": ["gà", "muối", "ớt", "chanh", "gia vị"],
+        "recipe": "Ướp gà với muối ớt, nướng vàng, ăn kèm muối tiêu chanh.",
+        "popular_regions": ["Toàn quốc"],
+        "holidays": ["Ngày thường"],
+        "calories": "500-600 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Gỏi đu đủ khô bò": {
+        "type": "khô",
+        "ingredients": ["đu đủ xanh", "khô bò", "rau răm", "đậu phộng", "nước mắm"],
+        "recipe": "Trộn đu đủ bào sợi với khô bò, rau răm, đậu phộng và nước mắm.",
+        "popular_regions": ["Sài Gòn", "Đà Lạt", "Nha Trang"],
+        "holidays": ["Ngày thường"],
+        "calories": "300-400 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Gỏi ngó sen": {
+        "type": "khô",
+        "ingredients": ["ngó sen", "tôm", "thịt heo", "rau răm", "nước mắm"],
+        "recipe": "Trộn ngó sen với tôm, thịt heo luộc, rau răm và nước mắm.",
+        "popular_regions": ["Miền Tây", "Sài Gòn", "Cần Thơ"],
+        "holidays": ["Ngày thường"],
+        "calories": "250-350 kcal",
+        "meal_time": ["khai vị"]
+    },
+    "Hột vịt lộn": {
+        "type": "khô",
+        "ingredients": ["trứng vịt lộn", "rau răm", "gừng", "muối tiêu"],
+        "recipe": "Luộc trứng vịt lộn, ăn kèm rau răm, gừng, chấm muối tiêu.",
+        "popular_regions": ["Toàn quốc"],
+        "holidays": ["Ngày thường"],
+        "calories": "200-300 kcal",
+        "meal_time": ["sáng", "tối"]
+    },
+    "Khoai lang kén": {
+        "type": "khô",
+        "ingredients": ["khoai lang", "bột mì", "đường", "dầu ăn", "mè"],
+        "recipe": "Nghiền khoai lang trộn bột, viên thành kén, chiên giòn, lăn đường mè.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Đà Lạt"],
+        "holidays": ["Ngày thường"],
+        "calories": "300-400 kcal",
+        "meal_time": ["xế", "tráng miệng"]
+    },
+    "Mì xào giòn": {
+        "type": "khô",
+        "ingredients": ["mì vàng", "tôm", "thịt", "rau củ", "nước tương"],
+        "recipe": "Chiên mì giòn, xào tôm thịt với rau củ, rưới lên mì.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Đà Nẵng"],
+        "holidays": ["Ngày thường"],
+        "calories": "600-700 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Nem nướng": {
+        "type": "khô",
+        "ingredients": ["thịt heo", "gia vị", "bánh tráng", "rau sống", "nước mắm"],
+        "recipe": "Nướng nem chua viên, cuốn bánh tráng với rau sống, chấm nước mắm.",
+        "popular_regions": ["Nha Trang", "Đà Lạt", "Sài Gòn"],
+        "holidays": ["Ngày thường"],
+        "calories": "400-500 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Ốc luộc": {
+        "type": "khô",
+        "ingredients": ["ốc", "sả", "gừng", "lá chanh", "muối tiêu chanh"],
+        "recipe": "Luộc ốc với sả, gừng, lá chanh, chấm muối tiêu chanh.",
+        "popular_regions": ["Hà Nội", "Hải Phòng", "Sài Gòn"],
+        "holidays": ["Ngày thường"],
+        "calories": "200-300 kcal",
+        "meal_time": ["tối"]
+    },
+    "Pizza Việt Nam": {
+        "type": "khô",
+        "ingredients": ["bột mì", "trứng", "chả lụa", "hành lá", "tương ớt"],
+        "recipe": "Tráng bột mì với trứng, rắc chả lụa, hành lá, sốt tương ớt.",
+        "popular_regions": ["Sài Gòn", "Hà Nội"],
+        "holidays": ["Ngày thường"],
+        "calories": "400-500 kcal",
+        "meal_time": ["sáng", "xế"]
+    },
+    "Súp cua": {
+        "type": "nước",
+        "ingredients": ["thịt cua", "trứng", "bắp", "nấm mèo", "hành lá"],
+        "recipe": "Nấu súp với thịt cua, trứng, bắp, nấm mèo, thêm hành lá.",
+        "popular_regions": ["Sài Gòn", "Hà Nội", "Đà Nẵng"],
+        "holidays": ["Ngày thường"],
+        "calories": "300-400 kcal",
+        "meal_time": ["sáng", "tối"]
+    },
+    "Sườn xào chua ngọt": {
+        "type": "khô",
+        "ingredients": ["sườn heo", "cà chua", "dứa", "ớt chuông", "gia vị"],
+        "recipe": "Xào sườn với cà chua, dứa, ớt chuông trong sốt chua ngọt.",
+        "popular_regions": ["Toàn quốc"],
+        "holidays": ["Ngày thường"],
+        "calories": "500-600 kcal",
+        "meal_time": ["trưa", "tối"]
+    },
+    "Xôi chiên phồng": {
+        "type": "khô",
+        "ingredients": ["xôi", "dầu ăn", "muối", "đường", "mè"],
+        "recipe": "Ép xôi thành miếng, chiên phồng, rắc muối đường hoặc mè.",
+        "popular_regions": ["Sài Gòn", "Miền Tây", "Cần Thơ"],
+        "holidays": ["Ngày thường"],
+        "calories": "400-500 kcal",
+        "meal_time": ["sáng", "xế"]
+    },
+    "Xôi gấc": {
+        "type": "khô",
+        "ingredients": ["gạo nếp", "gấc", "đường", "dừa nạo"],
+        "recipe": "Trộn gạo nếp với thịt gấc, đồ xôi, ăn kèm dừa nạo.",
+        "popular_regions": ["Toàn quốc"],
+        "holidays": ["Tết Nguyên Đán", "Cưới hỏi"],
+        "calories": "400-500 kcal",
+        "meal_time": ["sáng", "trưa"]
     }
 }
 
@@ -478,17 +775,17 @@ REGIONAL_FOODS = {
     "Đà Nẵng": ["Mì Quảng", "Cao lầu", "Bún bò Huế", "Bánh ướt thịt nướng", "Bánh bèo", "Bánh xèo"],
     "Miền Tây": ["Bánh xèo", "Cơm tấm", "Hủ tiếu", "Bánh rế", "Canh chua", "Lẩu mắm", "Bún nước lèo", "Chè ba màu", "Bánh pía", "Bánh da lợn", "Bánh chuối", "Bánh phồng tôm"],
     "Bắc Bộ": ["Bánh chưng", "Bánh cuốn", "Chả lụa", "Bún riêu", "Bánh đúc", "Bánh gai", "Bánh rán", "Nem chua"],
-    "Nam Định": ["Phở", "Bánh gai", "Bánh đúc"],
-    "Quảng Nam": ["Mì Quảng", "Cao lầu", "Bánh bột lọc"],
+    "Nam Định": ["Phở", "Bánh gai", "Bánh đúc", "Bánh nhãn", "Kẹo Sìu Châu"],
+    "Quảng Nam": ["Mì Quảng", "Cao lầu", "Bánh bột lọc", "Bánh tổ", "Bánh ướt"],
     "Thanh Hóa": ["Nem chua", "Bánh đa", "Cháo lòng"],
     "Hội An": ["Cao lầu", "Bánh bao", "Bánh vạc"],
     "Cần Thơ": ["Bánh xèo", "Canh chua", "Lẩu mắm", "Bún nước lèo", "Bánh tét"],
-    "Vũng Tàu": ["Bánh xèo", "Gỏi cuốn", "Hải sản nướng"],
+    "Vũng Tàu": ["Bánh xèo", "Gỏi cuốn", "Hải sản nướng", "Bánh khọt", "Hải sản", "Bún suông", "Bánh xèo"],
     "Phú Quốc": ["Gỏi cuốn", "Bún nước lèo", "Hải sản tươi sống"],
-    "Nha Trang": ["Bún bò Nam Bộ", "Bánh căn", "Bánh tráng nướng", "Hải sản"],
+    "Nha Trang": ["Bún bò Nam Bộ", "Bánh căn", "Bánh tráng nướng", "Hải sản", "Bún cá", "Nem nướng"],
     "Đà Lạt": ["Bánh ướt thịt nướng", "Bánh tráng nướng", "Bánh căn", "Dâu tây", "Atisô"],
-    "Bình Định": ["Bánh hỏi", "Bánh xèo", "Bún song thằn"],
-    "Quảng Ngãi": ["Mì Quảng", "Bánh tráng nước dừa", "Bánh đậu xanh"],
+    "Bình Định": ["Bánh hỏi", "Bánh xèo", "Bún song thằn", "Chả cá"],
+    "Quảng Ngãi": ["Mì Quảng", "Bánh tráng nước dừa", "Bánh đậu xanh", "Cá bống sông Trà", "Nem chua"],
     "Hải Phòng": ["Bánh mì", "Chả lụa", "Bánh đa cua", "Bánh cá", "Bánh đa kê"],
     "Quảng Ninh": ["Chả lụa", "Hải sản", "Bánh đa kê", "Bánh cá"],
     "Lạng Sơn": ["Bánh cuốn", "Vịt quay", "Măng ớt"],
@@ -503,20 +800,43 @@ REGIONAL_FOODS = {
     "Yên Bái": ["Xôi gà", "Cơm lam", "Măng đắng"],
     "Điện Biên": ["Xôi gà", "Cơm lam", "Pa pỉnh tộp"],
     "Hòa Bình": ["Bánh chưng", "Cá nướng", "Rượu cần"],
-    "Tây Ninh": ["Bánh xèo", "Bánh tráng phơi sương", "Mãng cầu"],
-    "Long An": ["Canh chua", "Lẩu mắm", "Dừa"],
-    "Tiền Giang": ["Hủ tiếu", "Trái cây", "Bánh phồng tôm"],
-    "Kiên Giang": ["Bún nước lèo", "Hải sản", "Nước mắm Phú Quốc"],
-    "An Giang": ["Lẩu mắm", "Bún cá", "Mắm cá linh"],
-    "Đồng Tháp": ["Lẩu mắm", "Cá lóc nướng trui", "Hoa sen"],
-    "Bến Tre": ["Chè đậu trắng", "Bánh da lợn", "Kẹo dừa"],
-    "Trà Vinh": ["Chè đậu trắng", "Bánh tét", "Mắm bò hóc"],
-    "Sóc Trăng": ["Bún nước lèo", "Bánh pía", "Lẩu mắm"],
-    "Bạc Liêu": ["Bánh pía", "Hủ tiếu", "Cua biển"],
-    "Cà Mau": ["Bún nước lèo", "Tôm khô", "Mắm ba khía"],
-    "Ninh Thuận": ["Bánh hỏi", "Nho", "Thịt cừu"],
-    "Bình Thuận": ["Bánh căn", "Hải sản", "Thanh long"]
+    "Tây Ninh": ["Bánh xèo", "Bánh tráng phơi sương", "Mãng cầu", "Hủ tiếu"],
+    "Long An": ["Canh chua", "Lẩu mắm", "Dừa", "Lẩu mắm", "Bún gỏi dà", "Khô cá lóc"],
+    "Tiền Giang": ["Hủ tiếu", "Trái cây", "Bánh phồng tôm", "Mắm tôm chua"],
+    "Kiên Giang": ["Bún nước lèo", "Hải sản", "Nước mắm Phú Quốc", "Khô mực"],
+    "An Giang": ["Lẩu mắm", "Bún cá", "Mắm cá linh", "Bánh bò", "Khô cá sặc"],
+    "Đồng Tháp": ["Lẩu mắm", "Cá lóc nướng trui", "Hoa sen", "Quýt hồng"],
+    "Bến Tre": ["Chè đậu trắng", "Bánh da lợn", "Kẹo dừa", "Mắm cá"],
+    "Trà Vinh": ["Chè đậu trắng", "Bánh tét", "Mắm bò hóc", "Bún nước lèo"],
+    "Sóc Trăng": ["Bún nước lèo", "Bánh pía", "Lẩu mắm", "Bánh tằm bì"],
+    "Bạc Liêu": ["Bánh pía", "Hủ tiếu", "Cua biển", "Mắm ba khía"],
+    "Cà Mau": ["Bún nước lèo", "Tôm khô", "Mắm ba khía", "Cá thòi lòi"],
+    "Ninh Thuận": ["Bánh hỏi", "Nho", "Thịt cừu", "Mắm cá"],
+    "Bình Thuận": ["Bánh căn", "Hải sản", "Thanh long", "Bánh xèo"],
+    "Hà Giang": ["Thắng cố", "Cơm lam", "Mèn mén", "Lợn cắp nách"],
+    "Cao Bằng": ["Phở chua", "Vịt quay", "Bánh cuốn chan", "Khâu nhục"],
+    "Bắc Kạn": ["Cá hồ", "Rêu đá", "Măng đá", "Cơm lam"],
+    "Tuyên Quang": ["Cá sông Lô", "Thịt chua", "Xôi ngũ sắc", "Bánh gai"],
+    "Thái Bình": ["Bánh cáy", "Bánh gai", "Canh cá diếc", "Bún bung"],
+    "Ninh Bình": ["Cơm cháy", "Dê núi Ninh Bình", "Ốc núi", "Miến lươn"],
+    "Hà Nam": ["Bún đậu", "Chả cá", "Bánh cuốn", "Nem chua"],
+    "Nghệ An": ["Nem chua", "Bánh mướt", "Cháo lươn", "Nhút Thanh Chương"],
+    "Hà Tĩnh": ["Kẹo cu đơ", "Bánh bèo", "Bánh đa", "Nước mắm"],
+    "Quảng Bình": ["Bánh bột lọc", "Cháo canh", "Bánh xèo", "Hải sản"],
+    "Quảng Trị": ["Bánh khoái", "Bánh ướt", "Bún bò", "Cơm hến"],
+    "Thừa Thiên Huế": ["Bún bò Huế", "Bánh bèo", "Cơm hến", "Chè Huế"],
+    "Phú Yên": ["Bánh canh", "Bánh hỏi", "Hải sản", "Chả cá"],
+    "Khánh Hòa": ["Bún cá", "Bánh căn", "Nem nướng", "Hải sản"],
+    "Kon Tum": ["Cơm lam", "Thịt nướng", "Rượu cần", "Măng rừng"],
+    "Gia Lai": ["Cơm lam", "Gà nướng", "Rượu cần", "Phở khô"],
+    "Đắk Lắk": ["Cơm lam", "Bò nướng", "Cà phê", "Rượu cần"],
+    "Đắk Nông": ["Cơm lam", "Thịt thú rừng", "Mật ong", "Rượu cần"],
+    "Lâm Đồng": ["Bánh ướt", "Bánh tráng nướng", "Dâu tây", "Atisô"],
+    "Bình Phước": ["Bánh canh", "Bún thịt nướng", "Hạt điều", "Trái cây"],
+    "Bình Dương": ["Bún thịt nướng", "Bánh bèo", "Bánh xèo", "Cơm tấm"],
+    "Đồng Nai": ["Bò lá lốt", "Bún thịt nướng", "Bánh canh", "Hủ tiếu"],
 }
+
 
 HOLIDAYS = {
     "Tết Nguyên Đán": (1, 1, 1, 10),      # Mùng 1-10 tháng 1 âm lịch
@@ -526,5 +846,14 @@ HOLIDAYS = {
     "Vu Lan": (7, 15, 7, 15),             # Ngày 15 tháng 7 âm lịch
     "Trung Thu": (8, 15, 8, 15),          # Ngày 15 tháng 8 âm lịch
     "Ông Táo chầu trời": (12, 23, 12, 23), # Ngày 23 tháng 12 âm lịch
-    "Ngày thường": (1, 1, 12, 31)         # Các ngày không phải lễ
+    #"Ngày thường": (1, 1, 12, 31)         # Các ngày không phải lễ
+    "Tết Nguyên Tiêu": (1, 15, 1, 15),    # Rằm tháng Giêng
+    "Tết Thanh Minh": (3, 3, 3, 10),      # Tiết Thanh Minh (3-10/3 âm lịch)
+    "Tết Đoan Ngọ": (5, 5, 5, 5),         # Mùng 5 tháng 5 âm lịch
+    "Tết Trùng Cửu": (9, 9, 9, 9),        # Mùng 9 tháng 9 âm lịch
+    "Tết Trùng Thập": (10, 10, 10, 10),   # Mùng 10 tháng 10 âm lịch
+    "Tết Táo Quân": (12, 23, 12, 23),     # Ông Táo chầu trời
+    "Rằm tháng Giêng": (1, 15, 1, 15),
+    "Rằm tháng Bảy": (7, 15, 7, 15),
+    "Rằm tháng Mười": (10, 15, 10, 15)
 }
