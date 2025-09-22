@@ -1,165 +1,64 @@
-Alfred Vị Việt
-Alfred Vị Việt là bot Telegram thông minh giúp bạn khám phá ẩm thực Việt Nam với các gợi ý món ăn theo ngày lễ, thời gian trong ngày, loại món, vùng miền, hoặc nguyên liệu. Bot hỗ trợ nhập liệu không dấu và bắt lỗi chính tả, tích hợp database để lưu món yêu thích, và giao diện người dùng với inline keyboard. Với 29 món ăn và 35 vùng miền, bot mang đến trải nghiệm cá nhân hóa. Chạy trên Flask, hỗ trợ SQLite và PostgreSQL, không phụ thuộc API ngoài trừ lunarcalendar cho ngày lễ.
-Tính năng chính
-
-Gợi ý món ăn thông minh (/suggest [khô/nước]):
-
-Gợi ý món ngẫu nhiên từ 29 món, ưu tiên theo:
-Ngày lễ: Tết Nguyên Đán (bánh chưng, bánh tét), Trung Thu (bánh rế, chè đậu trắng), Ngày thường (bất kỳ).
-Thời gian: Sáng (bánh mì, xôi gà), trưa (cơm tấm, mì Quảng), tối (lẩu mắm, bánh xèo).
-Loại món: Khô (bánh xèo) hoặc nước (phở) nếu nhập /suggest khô hoặc /suggest nước.
-Lịch sử: Tránh lặp 10 món gần nhất.
-
-
-Hiển thị chi tiết: loại, nguyên liệu, cách làm, vùng, dịp, calo.
-Inline keyboard: Xem công thức, gợi ý khác, lưu món.
-
-
-Món theo vùng (/region [tên vùng]):
-
-Gợi ý món từ 35 vùng (Hà Nội, Sài Gòn, Huế, v.v.).
-Hỗ trợ không dấu và bắt lỗi chính tả (ví dụ: "sai gon" → "Sài Gòn").
-
-
-Món theo nguyên liệu (/ingredient [nguyên liệu1, nguyên liệu2]):
-
-Gợi ý món từ nguyên liệu, hỗ trợ không dấu (ví dụ: "thit bo").
-Inline keyboard: Xem công thức, gợi ý khác, lưu món.
-
-
-Món theo vị trí (/location [tên vùng] hoặc GPS):
-
-Gợi ý món theo vùng nhập (hỗ trợ không dấu) hoặc GPS (hiện giả lập vùng "Sài Gòn").
-
-
-Lưu món yêu thích (/save [món]):
-
-Lưu tối đa 10 món vào database, hỗ trợ không dấu (ví dụ: /save pho).
-
-
-Xem món yêu thích (/favorites):
-
-Hiển thị danh sách món yêu thích với inline keyboard.
-
-
-Tra món (gửi tên món):
-
-Gửi tên món (có dấu hoặc không, ví dụ: "Phở" hoặc "pho") để xem chi tiết và nút lưu.
-
-
-Ủng hộ bot (/donate):
-
-Hiển thị link donate (PayPal, Momo) qua inline keyboard.
-
-
-Hỗ trợ không dấu và bắt lỗi chính tả:
-
-Nhận diện vùng và món ăn dù nhập không dấu hoặc sai chính tả (ví dụ: "pho" → "Phở", "banh xeo" → "Bánh xèo").
-Dùng fuzzy matching (Levenshtein distance) với ngưỡng 3 ký tự.
-
-
-Database:
-
-Lưu lịch sử gợi ý (eaten_foods) và món yêu thích (favorite_foods), giới hạn 10 món/user.
-Hỗ trợ SQLite (local) và PostgreSQL (Render).
-
-
-Hỗ trợ calo: Ước tính calo mỗi món.
-
-Ngày lễ: Gợi ý món theo Tết, Trung Thu (dùng lunarcalendar).
-
-Thời gian: Gợi ý món theo sáng, trưa, tối.
-
-
-Dữ liệu
-
-29 món ăn: Phở, Bánh chưng, Bún bò Huế, Bánh xèo, Cơm tấm, Bún chả, Bánh cuốn, Bánh mì, Hủ tiếu, Chả lụa, Bún riêu, Cao lầu, Mì Quảng, Bánh rế, Chè ba màu, Gỏi cuốn, Nem chua, Bánh tét, Canh chua, Lẩu mắm, Xôi gà, Bún nước lèo, Chả cá Lã Vọng, Bánh bèo, Bánh khoái, Bánh ướt thịt nướng, Bún bò Nam Bộ, Bánh bột lọc, Chè đậu trắng.
-35 vùng miền: Hà Nội, Sài Gòn, Huế, Đà Nẵng, Miền Tây, Bắc Bộ, Nam Định, Quảng Nam, Thanh Hóa, Hội An, Cần Thơ, Vũng Tàu, Phú Quốc, Nha Trang, Đà Lạt, Bình Định, Quảng Ngãi, Hải Phòng, Quảng Ninh, Lạng Sơn, Bắc Giang, Bắc Ninh, Hưng Yên, Vĩnh Phúc, Phú Thọ, Thái Nguyên, Sơn La, Lào Cai, Yên Bái, Điện Biên, Hòa Bình, Tây Ninh, Long An, Tiền Giang, Kiên Giang.
-
-Cài đặt
-Yêu cầu
-
-Python 3.8+
-Thư viện (xem requirements.txt):Flask==2.3.3
-python-telegram-bot==20.7
-gunicorn==21.2.0
-gevent==21.8.0
-pg8000==1.30.3
-lunarcalendar==0.0.9
-
-
-
-Cài đặt local
-
-Clone repository:git clone https://github.com/your_username/alfred-vi-viet.git
-cd alfred-vi-viet
-
-
-Tạo virtual environment:python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
-
-
-Cài thư viện:pip install -r requirements.txt
-
-
-Đặt biến môi trường:export TELEGRAM_BOT_TOKEN="your_bot_token"  # Linux/Mac
-set TELEGRAM_BOT_TOKEN="your_bot_token"     # Windows
-export PORT=10000
-
-
-Chạy bot:python alfred_bot.py
-
-
-
-Deploy trên Render
-
-Fork repository trên GitHub.
-Tạo service trên Render:
-Chọn Web Service, liên kết với repository.
-Environment: Python.
-Start command: gunicorn -w 4 -k gevent --bind 0.0.0.0:$PORT alfred_bot:flask_app.
-
-
-Thêm biến môi trường:
-TELEGRAM_BOT_TOKEN: Token từ @BotFather.
-WEBHOOK_URL: https://your-service.onrender.com.
-DATABASE_URL: URL PostgreSQL (hoặc dùng SQLite mặc định).
-PORT: 10000.
-
-
-Deploy: Chọn "Manual Deploy" > "Clear build cache & deploy".
-Đặt webhook:curl -X POST https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://your-service.onrender.com/webhook
-
-
-
-Sử dụng
-
-Tìm bot trên Telegram: @AlfredViViet (thay bằng tên thật sau khi tạo).
-Gửi lệnh:
-/start: Xem hướng dẫn.
-/suggest: Gợi ý món ngẫu nhiên.
-/suggest khô: Gợi ý món khô.
-/region Hà Nội hoặc sai gon: Món theo vùng.
-/ingredient thịt bò hoặc thit bo: Món từ nguyên liệu.
-/location Sài Gòn hoặc sai gon: Món theo vùng.
-/save Phở hoặc pho: Lưu món.
-/favorites: Xem món yêu thích.
-/donate: Ủng hộ bot.
-Gửi "Phở" hoặc "pho": Xem chi tiết món.
-
-
-Nhấn nút inline để tương tác.
-
-Đóng góp
-
-Báo lỗi: Mở issue trên GitHub.
-Thêm món/vùng: Sửa foods_data.py, tạo pull request.
-Cải tiến: Đề xuất tính năng qua issue hoặc pull request.
-Donate để giúp duy trì bot nếu bot hữu ích với bạn!
-
-Giấy phép
-MIT License. Xem LICENSE để biết thêm chi tiết.
-Liên hệ
-
-Telegram: @thnguyendinh
+# Alfred Bot
+
+**Alfred Bot** là một bot Telegram thông minh, giúp bạn khám phá ẩm thực Việt Nam với các tính năng gợi ý món ăn, lưu quán ăn yêu thích, và hơn thế nữa. Bot sử dụng MongoDB Atlas để lưu trữ dữ liệu bền vững và SQLite làm dự phòng, đảm bảo không mất dữ liệu sau khi triển khai lại.
+
+## Tính năng nổi bật
+- **Gợi ý món ăn (`/suggest`)**: Đề xuất món ăn Việt Nam ngẫu nhiên, tránh trùng với 15 món bạn đã ăn gần đây.
+- **Tìm món theo dịp lễ (`/holiday`)**: Gợi ý món phù hợp với các ngày lễ như Tết Nguyên Đán. Nhập `/holiday` để xem danh sách lễ.
+- **Quản lý món yêu thích (`/favorites`)**: Lưu, xem, và xóa món ăn yêu thích của bạn.
+- **Lưu và quản lý quán ăn (`/restaurant`, `/myrestaurants`)**: 
+  - Lưu quán ăn với vị trí GPS, đánh giá, và nhận xét.
+  - Xem top 20 quán ăn được đánh giá cao nhất từ cộng đồng.
+  - Xóa quán ăn đã lưu từ danh sách cá nhân (`/myrestaurants`).
+- **Tìm quán gần đây**: Gửi vị trí GPS để tìm các quán ăn trong vòng 1km.
+
+## Yêu cầu cài đặt
+1. **Python 3.11.9** và các thư viện:
+   ```plaintext
+   Flask==2.3.3
+   python-telegram-bot==20.7
+   gunicorn==21.2.0
+   pg8000==1.30.3
+   httpx==0.25.2
+   lunarcalendar==0.0.9
+   geopy==2.4.1
+   pymongo==4.6.3
+   ```
+2. **MongoDB Atlas**:
+   - Tạo cluster miễn phí tại [mongodb.com/atlas](https://www.mongodb.com/atlas).
+   - Thiết lập biến môi trường `MONGODB_URI` với connection string (ví dụ: `mongodb+srv://user:pass@cluster0.mongodb.net/alfred_bot`).
+3. **Token Telegram Bot**: Lấy từ BotFather và đặt vào biến môi trường `BOT_TOKEN`.
+
+## Cài đặt và triển khai
+1. Clone repository và cài đặt thư viện:
+   ```bash
+   git clone <repository_url>
+   cd alfred-bot
+   pip install -r requirements.txt
+   ```
+2. Thiết lập biến môi trường:
+   - `BOT_TOKEN`: Token từ BotFather.
+   - `MONGODB_URI`: Connection string từ MongoDB Atlas.
+   - `DB_PATH` (tùy chọn): Đường dẫn SQLite dự phòng (mặc định: `alfred.db`).
+3. Chạy bot cục bộ:
+   ```bash
+   python alfred_bot.py
+   ```
+4. Triển khai trên Render:
+   - Tạo Web Service, chọn Python, thêm biến môi trường.
+   - Push code và deploy.
+
+## Hướng dẫn sử dụng
+- `/start`: Bắt đầu và xem hướng dẫn.
+- `/suggest`: Gợi ý món ăn mới.
+- `/holiday [tên lễ]`: Tìm món phù hợp với dịp lễ.
+- `/favorites`: Xem/xóa món yêu thích.
+- `/restaurant`: Xem top 20 quán ăn được đánh giá cao.
+- `/myrestaurants`: Quản lý quán ăn của bạn (thêm/xóa).
+- Gửi vị trí GPS để lưu quán hoặc tìm quán gần.
+
+## Lưu ý
+- Dữ liệu được lưu trên MongoDB Atlas, đảm bảo không mất khi redeploy.
+- Mỗi người dùng chỉ lưu tối đa 15 món ăn gần nhất trong lịch sử.
+- Hỗ trợ SQLite fallback nếu không có MongoDB.
+- Telegram: @thnguyendinh
