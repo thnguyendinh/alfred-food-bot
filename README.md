@@ -1,6 +1,6 @@
 # Alfred Bot
 
-**Alfred Bot** là một bot Telegram thông minh, giúp bạn khám phá ẩm thực Việt Nam với các tính năng gợi ý món ăn, lưu quán ăn yêu thích, và hơn thế nữa. Bot sử dụng MongoDB Atlas để lưu trữ dữ liệu bền vững và SQLite làm dự phòng, đảm bảo không mất dữ liệu sau khi triển khai lại.
+**Alfred Bot** là một bot Telegram thông minh, giúp bạn khám phá ẩm thực Việt Nam với các tính năng gợi ý món ăn, lưu quán ăn yêu thích, và hơn thế nữa. Bot sử dụng MongoDB Atlas để lưu trữ dữ liệu bền vững và SQLite làm dự phòng, đảm bảo không mất dữ liệu sau khi triển khai lại. Username bot: @alfred_foot_bot
 
 ## Tính năng nổi bật
 - **Gợi ý món ăn (`/suggest`)**: Đề xuất món ăn Việt Nam ngẫu nhiên, tránh trùng với 15 món bạn đã ăn gần đây.
